@@ -26,6 +26,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotkeyManager = HotkeyManager()
     private let transcriptionService = TranscriptionService.shared
     private let clipboardManager = ClipboardManager.shared
+    private var recordingStartTime: Date?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         requestNotificationPermission()
@@ -272,6 +273,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupHotkeyManager() {
+        print("🎤 Setting up hotkey manager...")
+
         hotkeyManager.onKeyDown = { [weak self] in
             self?.handleHotkeyDown()
         }
@@ -280,22 +283,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.handleHotkeyUp()
         }
 
+        hotkeyManager.onPermissionGranted = { [weak self] in
+            print("✅ Hotkey listener ready - Press Right Command to record")
+            self?.showNotification(
+                title: "Voice Dictation Ready",
+                body: "Hold Right Command (⌘) to record, release to transcribe"
+            )
+        }
+
         if hotkeyManager.start() {
-            print("Hotkey listener started (Right Command)")
+            print("✅ Hotkey listener ready - Press Right Command to record")
+            showNotification(
+                title: "Voice Dictation Ready",
+                body: "Hold Right Command (⌘) to record, release to transcribe"
+            )
         } else {
+            print("❌ Failed to start hotkey listener - waiting for permission")
             showNotification(
                 title: "Permission Required",
-                body: "Please grant Accessibility permission in System Settings > Privacy & Security"
+                body: "Grant Accessibility permission in System Settings, then wait a moment - no restart needed!"
             )
         }
     }
 
     private func handleHotkeyDown() {
+        recordingStartTime = Date()
         updateStatusIcon(recording: true)
 
         guard audioRecorder.startRecording() else {
             showNotification(title: "Recording Failed", body: "Could not start recording")
-            updateStatusIcon(recording: false)
+            updateStatusIcon(error: true)
+            recordingStartTime = nil
             return
         }
 
@@ -303,22 +321,111 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handleHotkeyUp() {
+        let startTime = recordingStartTime
+        recordingStartTime = nil
         updateStatusIcon(recording: false)
 
         guard let recordingURL = audioRecorder.stopRecording() else {
             showNotification(title: "Recording Failed", body: "Could not save recording")
+            updateStatusIcon(error: true)
             return
         }
 
-        let message = "Recording saved to: \(recordingURL.path)"
-        print(message)
-        showNotification(title: "Recording Complete", body: message)
+        guard let startTime = startTime else {
+            print("No recording start time recorded")
+            return
+        }
+
+        let duration = Date().timeIntervalSince(startTime)
+        print("Recording duration: \(String(format: "%.1f", duration)) seconds")
+
+        guard duration >= 0.5 else {
+            print("Recording too short (\(String(format: "%.1f", duration))s), ignoring")
+            return
+        }
+
+        if duration > 60 {
+            showNotification(
+                title: "Recording Too Long",
+                body: "Recording limited to 60 seconds. Processing first 60 seconds..."
+            )
+        }
+
+        processRecording(url: recordingURL)
     }
 
-    private func updateStatusIcon(recording: Bool = false, processing: Bool = false, downloading: Bool = false) {
+    private func processRecording(url: URL) {
+        guard transcriptionService.isReady else {
+            showNotification(
+                title: "Transcription Unavailable",
+                body: "Whisper model not ready. Please wait for download to complete."
+            )
+            updateStatusIcon(error: true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.updateStatusIcon()
+            }
+            return
+        }
+
+        updateStatusIcon(processing: true)
+        print("Processing recording: \(url.path)")
+
+        Task {
+            do {
+                let text = try await transcriptionService.transcribe(audioFile: url)
+
+                await MainActor.run {
+                    updateStatusIcon()
+                    handleTranscriptionResult(text)
+                    cleanupRecording(url)
+                }
+            } catch {
+                await MainActor.run {
+                    updateStatusIcon(error: true)
+                    showNotification(
+                        title: "Transcription Failed",
+                        body: error.localizedDescription
+                    )
+                    print("Transcription error: \(error)")
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                        self?.updateStatusIcon()
+                    }
+
+                    cleanupRecording(url)
+                }
+            }
+        }
+    }
+
+    private func handleTranscriptionResult(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmed.isEmpty else {
+            print("No speech detected")
+            return
+        }
+
+        print("Transcription: \(trimmed)")
+        clipboardManager.copyAndPaste(trimmed)
+    }
+
+    private func cleanupRecording(_ url: URL) {
+        do {
+            try FileManager.default.removeItem(at: url)
+            print("Cleaned up recording: \(url.path)")
+        } catch {
+            print("Failed to cleanup recording: \(error)")
+        }
+    }
+
+    private func updateStatusIcon(recording: Bool = false, processing: Bool = false, downloading: Bool = false, error: Bool = false) {
         guard let button = statusItem?.button else { return }
 
-        if downloading {
+        if error {
+            button.image = NSImage(systemSymbolName: "exclamationmark.circle", accessibilityDescription: "Error")
+            button.image?.isTemplate = true
+        } else if downloading {
             button.image = NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: "Downloading")
             button.image?.isTemplate = true
         } else if processing {

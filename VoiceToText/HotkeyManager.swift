@@ -5,16 +5,21 @@ import ApplicationServices
 class HotkeyManager {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    private var permissionCheckTimer: Timer?
 
     var onKeyDown: (() -> Void)?
     var onKeyUp: (() -> Void)?
+    var onPermissionGranted: (() -> Void)?
 
     private let targetKeyCode: CGKeyCode = 54
     private var isTargetKeyPressed = false
+    private var hasPromptedForPermission = false
+    private var isRunning = false
 
     func start() -> Bool {
         guard checkAccessibilityPermission() else {
-            print("Accessibility permission not granted")
+            print("❌ Accessibility permission not granted - will retry when granted")
+            startPermissionPolling()
             return false
         }
 
@@ -23,21 +28,31 @@ class HotkeyManager {
 
     func stop() {
         cleanup()
+        stopPermissionPolling()
     }
 
     deinit {
         cleanup()
+        stopPermissionPolling()
     }
 }
 
 extension HotkeyManager {
     private func checkAccessibilityPermission() -> Bool {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
-        return AXIsProcessTrustedWithOptions(options)
+        let trusted = AXIsProcessTrusted()
+
+        if !trusted && !hasPromptedForPermission {
+            hasPromptedForPermission = true
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
+            _ = AXIsProcessTrustedWithOptions(options)
+            return false
+        }
+
+        return trusted
     }
 
     private func setupEventTap() -> Bool {
-        let eventMask = (1 << CGEventType.flagsChanged.rawValue)
+        let eventMask = (1 << CGEventType.flagsChanged.rawValue) | (1 << CGEventType.tapDisabledByTimeout.rawValue)
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -48,13 +63,23 @@ extension HotkeyManager {
                 guard let refcon = refcon else { return Unmanaged.passUnretained(event) }
 
                 let manager = Unmanaged<HotkeyManager>.fromOpaque(refcon).takeUnretainedValue()
+
+                if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                    print("⚠️ Event tap was disabled by system (type: \(type.rawValue)), re-enabling...")
+                    if let tap = manager.eventTap {
+                        CGEvent.tapEnable(tap: tap, enable: true)
+                        print("✓ Event tap re-enabled successfully")
+                    }
+                    return Unmanaged.passUnretained(event)
+                }
+
                 manager.handleEvent(type: type, event: event)
 
                 return Unmanaged.passUnretained(event)
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
-            print("Failed to create event tap")
+            print("❌ Failed to create event tap - check Accessibility permissions")
             return false
         }
 
@@ -63,7 +88,9 @@ extension HotkeyManager {
         CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
 
-        print("Hotkey manager started successfully")
+        isRunning = true
+        print("✅ Hotkey manager started successfully (Right Command key)")
+        print("📝 Listening for flagsChanged events...")
         return true
     }
 
@@ -73,21 +100,28 @@ extension HotkeyManager {
         let keycode = event.getIntegerValueField(.keyboardEventKeycode)
         let flags = event.flags
 
-        print("FlagsChanged event - keycode: \(keycode), flags: \(flags.rawValue), command: \(flags.contains(.maskCommand))")
+        print("DEBUG: FlagsChanged event detected")
+        print("  Keycode: \(keycode) (target: \(targetKeyCode))")
+        print("  Flags raw: \(flags.rawValue)")
+        print("  Command: \(flags.contains(.maskCommand))")
+        print("  Option: \(flags.contains(.maskAlternate))")
+        print("  Control: \(flags.contains(.maskControl))")
+        print("  Shift: \(flags.contains(.maskShift))")
 
         guard keycode == targetKeyCode else { return }
 
         let commandPressed = flags.contains(.maskCommand)
+        print("✓ Right Command key detected - pressed: \(commandPressed)")
 
         if commandPressed && !isTargetKeyPressed {
             isTargetKeyPressed = true
-            print("Right Command pressed - starting recording")
+            print("▶ Right Command DOWN - starting recording")
             DispatchQueue.main.async { [weak self] in
                 self?.onKeyDown?()
             }
         } else if !commandPressed && isTargetKeyPressed {
             isTargetKeyPressed = false
-            print("Right Command released - stopping recording")
+            print("■ Right Command UP - stopping recording")
             DispatchQueue.main.async { [weak self] in
                 self?.onKeyUp?()
             }
@@ -105,6 +139,34 @@ extension HotkeyManager {
             runLoopSource = nil
         }
 
+        isRunning = false
         print("Hotkey manager stopped")
+    }
+
+    private func startPermissionPolling() {
+        stopPermissionPolling()
+
+        print("🔄 Polling for Accessibility permission (every 2 seconds)...")
+        permissionCheckTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            self?.checkAndStartIfPermissionGranted()
+        }
+    }
+
+    private func stopPermissionPolling() {
+        permissionCheckTimer?.invalidate()
+        permissionCheckTimer = nil
+    }
+
+    @objc private func checkAndStartIfPermissionGranted() {
+        guard !isRunning else { return }
+
+        if AXIsProcessTrusted() {
+            print("✅ Accessibility permission granted! Starting hotkey manager...")
+            stopPermissionPolling()
+
+            if setupEventTap() {
+                onPermissionGranted?()
+            }
+        }
     }
 }
