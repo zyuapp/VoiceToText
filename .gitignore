@@ -121,3 +121,6 @@ Models/
 *.wav
 *.m4a
 Recordings/
+
+# Claude Code local settings
+.claude/settings.local.json
