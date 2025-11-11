@@ -27,6 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let transcriptionService = TranscriptionService.shared
     private let clipboardManager = ClipboardManager.shared
     private var recordingStartTime: Date?
+    private var downloadProgressMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         requestNotificationPermission()
@@ -59,6 +60,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
 
         statusItem?.menu = menu
+    }
+
+    private func updateDownloadProgress(_ progress: Double) {
+        guard let menu = statusItem?.menu else { return }
+
+        let progressText = String(format: "Downloading model: %.1f%%", progress * 100)
+
+        if let menuItem = downloadProgressMenuItem {
+            menuItem.title = progressText
+        } else {
+            let menuItem = NSMenuItem(title: progressText, action: nil, keyEquivalent: "")
+            menuItem.isEnabled = false
+            menu.insertItem(menuItem, at: 0)
+            downloadProgressMenuItem = menuItem
+        }
+    }
+
+    private func removeDownloadProgress() {
+        guard let menuItem = downloadProgressMenuItem else { return }
+        statusItem?.menu?.removeItem(menuItem)
+        downloadProgressMenuItem = nil
     }
 
     private func showNotification(title: String, body: String) {
@@ -99,10 +121,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 body: "First time setup: downloading Whisper model (~1.6GB)"
             )
 
-            transcriptionService.downloadModelIfNeeded { progress in
+            transcriptionService.downloadModelIfNeeded { [weak self] progress in
                 print(String(format: "Download progress: %.1f%%", progress * 100))
+                self?.updateDownloadProgress(progress)
             } completion: { [weak self] result in
                 self?.updateStatusIcon(downloading: false)
+                self?.removeDownloadProgress()
 
                 switch result {
                 case .success:
