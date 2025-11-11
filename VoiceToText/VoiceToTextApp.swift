@@ -25,6 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let audioRecorder = AudioRecorder()
     private let hotkeyManager = HotkeyManager()
     private let transcriptionService = TranscriptionService.shared
+    private let clipboardManager = ClipboardManager.shared
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         requestNotificationPermission()
@@ -56,6 +57,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem(title: "Test Recording (5s)", action: #selector(testRecording), keyEquivalent: "t"))
         menu.addItem(NSMenuItem(title: "Transcribe Last Recording", action: #selector(transcribeLastRecording), keyEquivalent: "r"))
+        menu.addItem(NSMenuItem(title: "Test Full Flow", action: #selector(testFullFlow), keyEquivalent: "f"))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
 
@@ -149,6 +151,68 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc private func testFullFlow() {
+        guard transcriptionService.isReady else {
+            showNotification(
+                title: "Transcription Unavailable",
+                body: "Whisper model not ready. Please wait for download to complete."
+            )
+            return
+        }
+
+        guard audioRecorder.startRecording() else {
+            showNotification(title: "Recording Failed", body: "Could not start recording")
+            return
+        }
+
+        showNotification(title: "Recording Started", body: "Recording for 5 seconds...")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+            guard let self = self else { return }
+
+            guard let recordingURL = self.audioRecorder.stopRecording() else {
+                self.showNotification(title: "Recording Failed", body: "Could not save recording")
+                return
+            }
+
+            self.updateStatusIcon(processing: true)
+            self.showNotification(title: "Transcribing", body: "Processing audio...")
+
+            Task {
+                do {
+                    let text = try await self.transcriptionService.transcribe(audioFile: recordingURL)
+
+                    await MainActor.run {
+                        self.updateStatusIcon(processing: false)
+
+                        if !text.isEmpty {
+                            self.clipboardManager.copyAndPaste(text)
+                            self.showNotification(
+                                title: "Full Flow Complete",
+                                body: "Text copied and pasted: \(text)"
+                            )
+                            print("Full flow transcription: \(text)")
+                        } else {
+                            self.showNotification(
+                                title: "Transcription Complete",
+                                body: "No speech detected"
+                            )
+                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.updateStatusIcon(processing: false)
+                        self.showNotification(
+                            title: "Transcription Failed",
+                            body: error.localizedDescription
+                        )
+                        print("Transcription error: \(error)")
+                    }
+                }
+            }
+        }
+    }
+
     @objc private func transcribeLastRecording() {
         guard transcriptionService.isReady else {
             showNotification(
@@ -175,11 +239,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
                 await MainActor.run {
                     updateStatusIcon(processing: false)
-                    showNotification(
-                        title: "Transcription Complete",
-                        body: text.isEmpty ? "No speech detected" : text
-                    )
-                    print("Transcription: \(text)")
+
+                    if !text.isEmpty {
+                        clipboardManager.copyAndPaste(text)
+                        showNotification(
+                            title: "Transcription Complete",
+                            body: "Text copied and pasted: \(text)"
+                        )
+                        print("Transcription: \(text)")
+                    } else {
+                        showNotification(
+                            title: "Transcription Complete",
+                            body: "No speech detected"
+                        )
+                    }
                 }
             } catch {
                 await MainActor.run {

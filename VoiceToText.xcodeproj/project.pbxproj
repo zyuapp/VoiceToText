@@ -35,6 +35,7 @@
 			children = (
 				BCFDA9A12EC2EDEC0065341A /* VoiceToText */,
 				BCFDA9A02EC2EDEC0065341A /* Products */,
+				BCFDAA092EC313040065341A /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -44,6 +45,14 @@
 				BCFDA99F2EC2EDEC0065341A /* VoiceToText.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		BCFDAA092EC313040065341A /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				BC000001000000000065341A /* Whisper.xcconfig */,
+			);
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
