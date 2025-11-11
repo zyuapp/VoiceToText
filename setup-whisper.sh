@@ -80,14 +80,6 @@ if [ $? -eq 0 ]; then
     echo "✓ Build Complete!"
     echo "======================================"
     echo ""
-
-    if [ -f "$PROJECT_ROOT/configure-xcode.sh" ]; then
-        echo "→ Configuring Xcode project..."
-        echo ""
-        "$PROJECT_ROOT/configure-xcode.sh"
-        echo ""
-    fi
-
     echo "Next steps:"
     echo ""
     echo "  1. Download Whisper model (happens automatically on first run)"
