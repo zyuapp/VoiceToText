@@ -4,6 +4,7 @@ import AVFoundation
 class AudioRecorder: NSObject {
     private var audioRecorder: AVAudioRecorder?
     private var recordingURL: URL?
+    private(set) var lastRecordingURL: URL?
 
     var isRecording: Bool {
         audioRecorder?.isRecording ?? false
@@ -22,6 +23,7 @@ class AudioRecorder: NSObject {
         }
 
         recorder.stop()
+        lastRecordingURL = recordingURL
         print("Recording stopped: \(recordingURL?.path ?? "unknown")")
         return recordingURL
     }

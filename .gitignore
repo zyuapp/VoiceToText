@@ -124,3 +124,9 @@ Recordings/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Whisper.cpp external dependency
+whisper.cpp/
+
+# Xcode project backup
+*.pbxproj.backup
