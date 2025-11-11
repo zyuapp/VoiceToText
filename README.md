@@ -1,6 +1,6 @@
 # VoiceToText
 
-> Built with [Claude Code](https://claude.ai/code) - AI-assisted development from concept to completion.
+> Built with [Claude Code](https://claude.ai/code) - AI-assisted development from concept to completion. 🤖
 
 A lightweight, privacy-first macOS menu bar app for offline voice dictation. Hold Command, speak, and your words appear at your cursor.
 
@@ -57,10 +57,6 @@ ls -la ~/Library/Developer/Xcode/DerivedData/VoiceToText-*/Build/Products/Debug/
 ## Development
 
 See [CLAUDE.md](CLAUDE.md) for architecture details and development guidelines.
-
-## License
-
-MIT License - See [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
