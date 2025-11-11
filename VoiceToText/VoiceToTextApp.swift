@@ -23,11 +23,13 @@ struct VoiceToTextApp: App {
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let audioRecorder = AudioRecorder()
+    private let hotkeyManager = HotkeyManager()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         requestNotificationPermission()
         setupStatusItem()
         setupMenus()
+        setupHotkeyManager()
     }
 
     private func requestNotificationPermission() {
@@ -50,7 +52,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupMenus() {
         let menu = NSMenu()
 
-        menu.addItem(NSMenuItem(title: "Test Recording", action: #selector(testRecording), keyEquivalent: "t"))
+        menu.addItem(NSMenuItem(title: "Test Recording (5s)", action: #selector(testRecording), keyEquivalent: "t"))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
 
@@ -104,5 +106,61 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func quit() {
         NSApplication.shared.terminate(nil)
+    }
+
+    private func setupHotkeyManager() {
+        hotkeyManager.onKeyDown = { [weak self] in
+            self?.handleHotkeyDown()
+        }
+
+        hotkeyManager.onKeyUp = { [weak self] in
+            self?.handleHotkeyUp()
+        }
+
+        if hotkeyManager.start() {
+            print("Hotkey listener started (Right Command)")
+        } else {
+            showNotification(
+                title: "Permission Required",
+                body: "Please grant Accessibility permission in System Settings > Privacy & Security"
+            )
+        }
+    }
+
+    private func handleHotkeyDown() {
+        updateStatusIcon(recording: true)
+
+        guard audioRecorder.startRecording() else {
+            showNotification(title: "Recording Failed", body: "Could not start recording")
+            updateStatusIcon(recording: false)
+            return
+        }
+
+        print("Recording started via hotkey")
+    }
+
+    private func handleHotkeyUp() {
+        updateStatusIcon(recording: false)
+
+        guard let recordingURL = audioRecorder.stopRecording() else {
+            showNotification(title: "Recording Failed", body: "Could not save recording")
+            return
+        }
+
+        let message = "Recording saved to: \(recordingURL.path)"
+        print(message)
+        showNotification(title: "Recording Complete", body: message)
+    }
+
+    private func updateStatusIcon(recording: Bool) {
+        guard let button = statusItem?.button else { return }
+
+        if recording {
+            button.image = NSImage(systemSymbolName: "mic.fill.badge.plus", accessibilityDescription: "Recording")
+            button.image?.isTemplate = true
+        } else {
+            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Voice to Text")
+            button.image?.isTemplate = true
+        }
     }
 }
