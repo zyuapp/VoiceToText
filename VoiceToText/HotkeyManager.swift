@@ -9,9 +9,11 @@ class HotkeyManager {
 
     var onKeyDown: (() -> Void)?
     var onKeyUp: (() -> Void)?
+    var onCancelRequested: (() -> Void)?
     var onPermissionGranted: (() -> Void)?
 
     private let targetKeyCode: CGKeyCode = 54
+    private let escapeKeyCode: CGKeyCode = 53
     private var isTargetKeyPressed = false
     private var hasPromptedForPermission = false
     private var isRunning = false
@@ -52,7 +54,9 @@ extension HotkeyManager {
     }
 
     private func setupEventTap() -> Bool {
-        let eventMask = (1 << CGEventType.flagsChanged.rawValue) | (1 << CGEventType.tapDisabledByTimeout.rawValue)
+        let eventMask = (1 << CGEventType.flagsChanged.rawValue) |
+                       (1 << CGEventType.keyDown.rawValue) |
+                       (1 << CGEventType.tapDisabledByTimeout.rawValue)
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -95,8 +99,14 @@ extension HotkeyManager {
     }
 
     private func handleEvent(type: CGEventType, event: CGEvent) {
-        guard type == .flagsChanged else { return }
+        if type == .flagsChanged {
+            handleFlagsChanged(event: event)
+        } else if type == .keyDown {
+            handleKeyDown(event: event)
+        }
+    }
 
+    private func handleFlagsChanged(event: CGEvent) {
         let keycode = event.getIntegerValueField(.keyboardEventKeycode)
         let flags = event.flags
 
@@ -125,6 +135,17 @@ extension HotkeyManager {
             DispatchQueue.main.async { [weak self] in
                 self?.onKeyUp?()
             }
+        }
+    }
+
+    private func handleKeyDown(event: CGEvent) {
+        let keycode = event.getIntegerValueField(.keyboardEventKeycode)
+
+        guard keycode == escapeKeyCode && isTargetKeyPressed else { return }
+
+        print("⎋ Escape key pressed while recording - cancelling")
+        DispatchQueue.main.async { [weak self] in
+            self?.onCancelRequested?()
         }
     }
 

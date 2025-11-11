@@ -27,6 +27,22 @@ class AudioRecorder: NSObject {
         print("Recording stopped: \(recordingURL?.path ?? "unknown")")
         return recordingURL
     }
+
+    func cancelRecording() {
+        guard let recorder = audioRecorder, recorder.isRecording else {
+            return
+        }
+
+        recorder.stop()
+        print("Recording cancelled")
+
+        if let url = recordingURL {
+            try? FileManager.default.removeItem(at: url)
+            print("Cancelled recording cleaned up: \(url.path)")
+        }
+
+        recordingURL = nil
+    }
 }
 
 extension AudioRecorder {

@@ -161,11 +161,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.handleHotkeyUp()
         }
 
+        hotkeyManager.onCancelRequested = { [weak self] in
+            self?.handleCancellation()
+        }
+
         hotkeyManager.onPermissionGranted = { [weak self] in
             print("✅ Hotkey listener ready - Press Right Command to record")
             self?.showNotification(
                 title: "Voice Dictation Ready",
-                body: "Hold Right Command (⌘) to record, release to transcribe"
+                body: "Hold Right Command (⌘) to record, press Escape to cancel"
             )
         }
 
@@ -173,7 +177,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             print("✅ Hotkey listener ready - Press Right Command to record")
             showNotification(
                 title: "Voice Dictation Ready",
-                body: "Hold Right Command (⌘) to record, release to transcribe"
+                body: "Hold Right Command (⌘) to record, press Escape to cancel"
             )
         } else {
             print("❌ Failed to start hotkey listener - waiting for permission")
@@ -230,6 +234,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         processRecording(url: recordingURL)
+    }
+
+    private func handleCancellation() {
+        recordingStartTime = nil
+        updateStatusIcon()
+        audioRecorder.cancelRecording()
+        print("Recording cancelled by user")
     }
 
     private func processRecording(url: URL) {
