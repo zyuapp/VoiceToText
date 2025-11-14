@@ -28,6 +28,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let clipboardManager = ClipboardManager.shared
     private var recordingStartTime: Date?
     private var downloadProgressMenuItem: NSMenuItem?
+    private static let selectedDeviceKey = "selectedAudioInputDevice"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         requestNotificationPermission()
@@ -35,6 +36,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenus()
         setupHotkeyManager()
         setupTranscriptionService()
+        restoreSelectedDevice()
     }
 
     private func requestNotificationPermission() {
@@ -57,9 +59,86 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupMenus() {
         let menu = NSMenu()
 
+        let audioInputItem = NSMenuItem(title: "Audio Input", action: nil, keyEquivalent: "")
+        audioInputItem.submenu = createAudioInputSubmenu()
+        menu.addItem(audioInputItem)
+
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
 
         statusItem?.menu = menu
+    }
+
+    private func createAudioInputSubmenu() -> NSMenu {
+        let submenu = NSMenu()
+        let devices = AudioRecorder.getAvailableInputDevices()
+        let currentDeviceID = AudioRecorder.getCurrentInputDeviceID()
+        let savedDeviceID = UserDefaults.standard.object(forKey: Self.selectedDeviceKey) as? UInt32
+
+        let defaultItem = NSMenuItem(
+            title: "System Default",
+            action: #selector(selectAudioDevice(_:)),
+            keyEquivalent: ""
+        )
+        defaultItem.tag = 0
+        defaultItem.target = self
+        defaultItem.state = savedDeviceID == nil ? .on : .off
+        submenu.addItem(defaultItem)
+
+        if !devices.isEmpty {
+            submenu.addItem(NSMenuItem.separator())
+        }
+
+        for device in devices {
+            let item = NSMenuItem(
+                title: device.name,
+                action: #selector(selectAudioDevice(_:)),
+                keyEquivalent: ""
+            )
+            item.tag = Int(device.id)
+            item.target = self
+
+            let isSelected = if let savedID = savedDeviceID {
+                device.id == savedID
+            } else {
+                device.id == currentDeviceID
+            }
+
+            item.state = isSelected ? .on : .off
+            submenu.addItem(item)
+        }
+
+        return submenu
+    }
+
+    @objc private func selectAudioDevice(_ sender: NSMenuItem) {
+        guard let menu = statusItem?.menu,
+              let audioInputItem = menu.items.first(where: { $0.title == "Audio Input" }),
+              let submenu = audioInputItem.submenu else { return }
+
+        for item in submenu.items {
+            item.state = .off
+        }
+
+        sender.state = .on
+
+        if sender.tag == 0 {
+            UserDefaults.standard.removeObject(forKey: Self.selectedDeviceKey)
+            audioRecorder.setInputDevice(id: nil)
+            print("Audio input set to system default")
+        } else {
+            let deviceID = UInt32(sender.tag)
+            UserDefaults.standard.set(deviceID, forKey: Self.selectedDeviceKey)
+            audioRecorder.setInputDevice(id: deviceID)
+            print("Audio input set to: \(sender.title)")
+        }
+    }
+
+    private func restoreSelectedDevice() {
+        if let savedDeviceID = UserDefaults.standard.object(forKey: Self.selectedDeviceKey) as? UInt32 {
+            audioRecorder.setInputDevice(id: savedDeviceID)
+            print("Restored audio input device: \(savedDeviceID)")
+        }
     }
 
     private func updateDownloadProgress(_ progress: Double) {
