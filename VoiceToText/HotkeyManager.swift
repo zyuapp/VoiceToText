@@ -33,6 +33,10 @@ class HotkeyManager {
         stopPermissionPolling()
     }
 
+    func hasAccessibilityPermission() -> Bool {
+        return AXIsProcessTrusted()
+    }
+
     deinit {
         cleanup()
         stopPermissionPolling()

@@ -28,6 +28,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let clipboardManager = ClipboardManager.shared
     private var recordingStartTime: Date?
     private var downloadProgressMenuItem: NSMenuItem?
+    private var accessibilityMenuItem: NSMenuItem?
     private static let selectedDeviceKey = "selectedAudioInputDevice"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -37,6 +38,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupHotkeyManager()
         setupTranscriptionService()
         restoreSelectedDevice()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        updateAccessibilityMenuItem()
     }
 
     private func requestNotificationPermission() {
@@ -58,6 +63,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupMenus() {
         let menu = NSMenu()
+
+        accessibilityMenuItem = createAccessibilityMenuItem()
+        menu.addItem(accessibilityMenuItem!)
 
         let audioInputItem = NSMenuItem(title: "Audio Input", action: nil, keyEquivalent: "")
         audioInputItem.submenu = createAudioInputSubmenu()
@@ -162,6 +170,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         downloadProgressMenuItem = nil
     }
 
+    private func createAccessibilityMenuItem() -> NSMenuItem {
+        let hasPermission = hotkeyManager.hasAccessibilityPermission()
+        let title = hasPermission ? "Accessibility Permission ✓" : "Enable Accessibility Permission..."
+        let menuItem = NSMenuItem(
+            title: title,
+            action: hasPermission ? nil : #selector(openAccessibilitySettings),
+            keyEquivalent: ""
+        )
+        menuItem.target = self
+        menuItem.isEnabled = !hasPermission
+        return menuItem
+    }
+
+    @objc private func openAccessibilitySettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
+    }
+
+    private func updateAccessibilityMenuItem() {
+        guard let menuItem = accessibilityMenuItem else { return }
+
+        let hasPermission = hotkeyManager.hasAccessibilityPermission()
+        menuItem.title = hasPermission ? "Accessibility Permission ✓" : "Enable Accessibility Permission..."
+        menuItem.action = hasPermission ? nil : #selector(openAccessibilitySettings)
+        menuItem.isEnabled = !hasPermission
+    }
+
     private func showNotification(title: String, body: String) {
         let content = UNMutableNotificationContent()
         content.title = title
@@ -246,6 +281,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         hotkeyManager.onPermissionGranted = { [weak self] in
             print("✅ Hotkey listener ready - Press Right Command to record")
+            self?.updateAccessibilityMenuItem()
             self?.showNotification(
                 title: "Voice Dictation Ready",
                 body: "Hold Right Command (⌘) to record, press Escape to cancel"
