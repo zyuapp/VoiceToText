@@ -22,8 +22,17 @@ A lightweight, privacy-first macOS menu bar app for offline voice dictation. Hol
 
 ## Installation
 
-### Download Pre-built App (Coming Soon)
-Download the latest release from the Releases page and drag to Applications.
+### Download Pre-built App
+
+Install with Homebrew Cask:
+
+```bash
+brew install --cask zyuapp/tap/voice-to-text
+```
+
+Or download the latest zip from the GitHub Releases page and move `VoiceToText.app` to `/Applications`.
+
+Note: builds are currently unsigned and not notarized, so macOS may show a security warning on first launch.
 
 ### Build from Source
 
@@ -57,6 +66,17 @@ ls -la ~/Library/Developer/Xcode/DerivedData/VoiceToText-*/Build/Products/Debug/
 ## Development
 
 See [CLAUDE.md](CLAUDE.md) for architecture details and development guidelines.
+
+## Release Process
+
+Tag and push a version to trigger the release workflow:
+
+```bash
+git tag v1.1
+git push origin v1.1
+```
+
+The workflow builds a Release app, creates a zip asset, publishes it to GitHub Releases, and can update `zyuapp/homebrew-tap` automatically when `HOMEBREW_TAP_TOKEN` is configured in repository secrets.
 
 ## Acknowledgments
 
