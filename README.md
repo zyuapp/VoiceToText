@@ -67,17 +67,6 @@ ls -la ~/Library/Developer/Xcode/DerivedData/VoiceToText-*/Build/Products/Debug/
 
 See [CLAUDE.md](CLAUDE.md) for architecture details and development guidelines.
 
-## Release Process
-
-Tag and push a version to trigger the release workflow:
-
-```bash
-git tag v1.1
-git push origin v1.1
-```
-
-The workflow builds a Release app, creates a zip asset, publishes it to GitHub Releases, and can update `zyuapp/homebrew-tap` automatically when `HOMEBREW_TAP_TOKEN` is configured in repository secrets.
-
 ## Acknowledgments
 
 - [Whisper.cpp](https://github.com/ggerganov/whisper.cpp) - High-performance inference of OpenAI's Whisper
