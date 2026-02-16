@@ -8,13 +8,13 @@
 
 /* Begin PBXFileReference section */
 		BC000001000000000065341A /* Whisper.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Whisper.xcconfig; sourceTree = "<group>"; };
-		BCFDA99F2EC2EDEC0065341A /* VoiceToText.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VoiceToText.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BCFDA99F2EC2EDEC0065341A /* JustSpeak.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JustSpeak.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		BCFDA9A12EC2EDEC0065341A /* VoiceToText */ = {
+		BCFDA9A12EC2EDEC0065341A /* JustSpeak */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = VoiceToText;
+			path = JustSpeak;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -33,7 +33,7 @@
 		BCFDA9962EC2EDEC0065341A = {
 			isa = PBXGroup;
 			children = (
-				BCFDA9A12EC2EDEC0065341A /* VoiceToText */,
+				BCFDA9A12EC2EDEC0065341A /* JustSpeak */,
 				BCFDA9A02EC2EDEC0065341A /* Products */,
 				BCFDAA092EC313040065341A /* Recovered References */,
 			);
@@ -42,7 +42,7 @@
 		BCFDA9A02EC2EDEC0065341A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				BCFDA99F2EC2EDEC0065341A /* VoiceToText.app */,
+				BCFDA99F2EC2EDEC0065341A /* JustSpeak.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -58,9 +58,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		BCFDA99E2EC2EDEC0065341A /* VoiceToText */ = {
+		BCFDA99E2EC2EDEC0065341A /* JustSpeak */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = BCFDA9AA2EC2EDED0065341A /* Build configuration list for PBXNativeTarget "VoiceToText" */;
+			buildConfigurationList = BCFDA9AA2EC2EDED0065341A /* Build configuration list for PBXNativeTarget "JustSpeak" */;
 			buildPhases = (
 				BCFDA99B2EC2EDEC0065341A /* Sources */,
 				BCFDA99C2EC2EDEC0065341A /* Frameworks */,
@@ -71,13 +71,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				BCFDA9A12EC2EDEC0065341A /* VoiceToText */,
+				BCFDA9A12EC2EDEC0065341A /* JustSpeak */,
 			);
-			name = VoiceToText;
+			name = JustSpeak;
 			packageProductDependencies = (
 			);
-			productName = VoiceToText;
-			productReference = BCFDA99F2EC2EDEC0065341A /* VoiceToText.app */;
+			productName = JustSpeak;
+			productReference = BCFDA99F2EC2EDEC0065341A /* JustSpeak.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -95,7 +95,7 @@
 					};
 				};
 			};
-			buildConfigurationList = BCFDA99A2EC2EDEC0065341A /* Build configuration list for PBXProject "VoiceToText" */;
+			buildConfigurationList = BCFDA99A2EC2EDEC0065341A /* Build configuration list for PBXProject "JustSpeak" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -109,7 +109,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				BCFDA99E2EC2EDEC0065341A /* VoiceToText */,
+				BCFDA99E2EC2EDEC0065341A /* JustSpeak */,
 			);
 		};
 /* End PBXProject section */
@@ -258,7 +258,7 @@
 				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = VoiceToText/VoiceToText.entitlements;
+				CODE_SIGN_ENTITLEMENTS = JustSpeak/JustSpeak.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -267,7 +267,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VoiceToText needs access to your microphone to record your voice for transcription.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "JustSpeak needs access to your microphone to record your voice for transcription.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -283,7 +283,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.zyu.VoiceToText;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zyu.just-speak;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
@@ -305,7 +305,7 @@
 				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = VoiceToText/VoiceToText.entitlements;
+				CODE_SIGN_ENTITLEMENTS = JustSpeak/JustSpeak.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -315,7 +315,7 @@
 				EXCLUDED_ARCHS = x86_64;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VoiceToText needs access to your microphone to record your voice for transcription.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "JustSpeak needs access to your microphone to record your voice for transcription.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -331,7 +331,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.zyu.VoiceToText;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zyu.just-speak;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
@@ -350,7 +350,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		BCFDA99A2EC2EDEC0065341A /* Build configuration list for PBXProject "VoiceToText" */ = {
+		BCFDA99A2EC2EDEC0065341A /* Build configuration list for PBXProject "JustSpeak" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				BCFDA9A82EC2EDED0065341A /* Debug */,
@@ -359,7 +359,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		BCFDA9AA2EC2EDED0065341A /* Build configuration list for PBXNativeTarget "VoiceToText" */ = {
+		BCFDA9AA2EC2EDED0065341A /* Build configuration list for PBXNativeTarget "JustSpeak" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				BCFDA9AB2EC2EDED0065341A /* Debug */,

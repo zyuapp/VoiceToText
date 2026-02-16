@@ -1,6 +1,6 @@
 //
-//  VoiceToTextApp.swift
-//  VoiceToText
+//  JustSpeakApp.swift
+//  JustSpeak
 //
 //  Created by Zhuocheng Yu on 11/10/25.
 //
@@ -10,7 +10,7 @@ import AppKit
 import UserNotifications
 
 @main
-struct VoiceToTextApp: App {
+struct JustSpeakApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
@@ -30,9 +30,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var downloadProgressMenuItem: NSMenuItem?
     private var accessibilityMenuItem: NSMenuItem?
     private static let selectedDeviceKey = "selectedAudioInputDevice"
+    private static let didMigratePreferencesKey = "didMigrateLegacyPreferences"
+    private static let legacyBundleIdentifier = "com.zyu.VoiceToText"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         requestNotificationPermission()
+        migrateLegacyPreferencesIfNeeded()
         setupStatusItem()
         setupMenus()
         setupHotkeyManager()
@@ -56,9 +59,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Voice to Text")
+            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "JustSpeak")
             button.image?.isTemplate = true
         }
+    }
+
+    private func migrateLegacyPreferencesIfNeeded() {
+        let defaults = UserDefaults.standard
+
+        guard !defaults.bool(forKey: Self.didMigratePreferencesKey) else { return }
+
+        if let legacyDefaults = UserDefaults(suiteName: Self.legacyBundleIdentifier),
+           defaults.object(forKey: Self.selectedDeviceKey) == nil,
+           let legacyDeviceID = legacyDefaults.object(forKey: Self.selectedDeviceKey) {
+            defaults.set(legacyDeviceID, forKey: Self.selectedDeviceKey)
+            print("Migrated selected audio input from VoiceToText preferences")
+        }
+
+        defaults.set(true, forKey: Self.didMigratePreferencesKey)
     }
 
     private func setupMenus() {
@@ -439,7 +457,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = NSImage(systemSymbolName: "mic.fill.badge.plus", accessibilityDescription: "Recording")
             button.image?.isTemplate = true
         } else {
-            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Voice to Text")
+            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "JustSpeak")
             button.image?.isTemplate = true
         }
     }

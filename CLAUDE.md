@@ -13,20 +13,20 @@ Native macOS menu bar app for offline voice dictation powered by Whisper.cpp. Us
 ./setup-whisper.sh
 
 # Build the app
-xcodebuild -project VoiceToText.xcodeproj -scheme VoiceToText -configuration Debug clean build
+xcodebuild -project JustSpeak.xcodeproj -scheme JustSpeak -configuration Debug clean build
 
 # Find built app
-ls -la ~/Library/Developer/Xcode/DerivedData/VoiceToText-*/Build/Products/Debug/VoiceToText.app
+ls -la ~/Library/Developer/Xcode/DerivedData/JustSpeak-*/Build/Products/Debug/JustSpeak.app
 
 # Open downloaded model directory
-open ~/Library/Application\ Support/VoiceToText/Models/
+open ~/Library/Application\ Support/just-speak/Models/
 ```
 
 If build errors mention missing `libwhisper`/`libggml` symbols, run `./setup-whisper.sh` again.
 
 ## Runtime Paths
 
-- Whisper model path: `~/Library/Application Support/VoiceToText/Models/ggml-large-v3-turbo.bin`
+- Whisper model path: `~/Library/Application Support/just-speak/Models/ggml-large-v3-turbo.bin`
 - Recordings are written to `FileManager.default.temporaryDirectory` as `recording_<timestamp>.wav`
 - Temporary recordings are deleted after transcription or cancellation
 
@@ -39,7 +39,7 @@ If build errors mention missing `libwhisper`/`libggml` symbols, run `./setup-whi
 - Hidden from dock via `INFOPLIST_KEY_LSUIElement = YES`
 
 **Core Components:**
-- `AppDelegate` (`VoiceToTextApp.swift`): status menu, notifications, record/transcribe/paste flow orchestration
+- `AppDelegate` (`JustSpeakApp.swift`): status menu, notifications, record/transcribe/paste flow orchestration
 - `HotkeyManager` (`HotkeyManager.swift`): global event tap for Right Command down/up and Escape cancel
 - `AudioRecorder` (`AudioRecorder.swift`): `AVAudioRecorder` wrapper plus CoreAudio input-device selection
 - `TranscriptionService` (`TranscriptionService.swift`): model lifecycle and async transcription entry point
@@ -79,5 +79,5 @@ AVFormatIDKey: kAudioFormatLinearPCM
 ## Non-Obvious Gotchas
 
 - First launch downloads a large model (~1.6 GB). App is not transcription-ready until download and `TranscriptionService.initialize()` complete.
-- `VoiceToTextApp.handleHotkeyUp()` warns when duration is over 60s, but does not trim audio yet. If you change duration UX, keep behavior and messaging aligned.
+- `JustSpeakApp.handleHotkeyUp()` warns when duration is over 60s, but does not trim audio yet. If you change duration UX, keep behavior and messaging aligned.
 - `Whisper.xcconfig` links static libs from `whisper.cpp/build/...`; if you clean that folder, app linking will fail until rebuilt.

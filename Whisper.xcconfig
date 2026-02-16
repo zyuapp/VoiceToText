@@ -2,7 +2,7 @@
 // This file is automatically included in both Debug and Release builds
 // Using static linking for self-contained binary
 
-SWIFT_OBJC_BRIDGING_HEADER = VoiceToText/VoiceToText-Bridging-Header.h
+SWIFT_OBJC_BRIDGING_HEADER = JustSpeak/JustSpeak-Bridging-Header.h
 
 HEADER_SEARCH_PATHS = $(inherited) $(PROJECT_DIR)/whisper.cpp/include/** $(PROJECT_DIR)/whisper.cpp/ggml/include/**
 

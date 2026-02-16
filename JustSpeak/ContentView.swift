@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  VoiceToText
+//  JustSpeak
 //
 //  Created by Zhuocheng Yu on 11/10/25.
 //

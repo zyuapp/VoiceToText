@@ -1,4 +1,4 @@
-# VoiceToText
+# JustSpeak
 
 > Built with [Claude Code](https://claude.ai/code) - AI-assisted development from concept to completion. 🤖
 
@@ -27,26 +27,26 @@ A lightweight, privacy-first macOS menu bar app for offline voice dictation. Hol
 Install with Homebrew Cask:
 
 ```bash
-brew install --cask zyuapp/tap/voice-to-text
+brew install --cask zyuapp/tap/just-speak
 ```
 
-Or download the latest zip from the GitHub Releases page and move `VoiceToText.app` to `/Applications`.
+Or download the latest zip from the GitHub Releases page and move `JustSpeak.app` to `/Applications`.
 
-Note: builds are currently unsigned and not notarized, so macOS may show a security warning on first launch.
+Note: builds are currently unsigned and not notarized, so macOS may show a security warning on first launch. If that happens, open System Settings > Privacy & Security, scroll to Security, click Open Anyway for JustSpeak, then confirm Open.
 
 ### Build from Source
 
 ```bash
 # Clone and setup
-git clone https://github.com/yourusername/VoiceToText.git
-cd VoiceToText
+git clone https://github.com/zyuapp/just-speak.git
+cd just-speak
 ./setup-whisper.sh
 
 # Build
-xcodebuild -project VoiceToText.xcodeproj -scheme VoiceToText -configuration Debug clean build
+xcodebuild -project JustSpeak.xcodeproj -scheme JustSpeak -configuration Debug clean build
 
 # Find built app
-ls -la ~/Library/Developer/Xcode/DerivedData/VoiceToText-*/Build/Products/Debug/VoiceToText.app
+ls -la ~/Library/Developer/Xcode/DerivedData/JustSpeak-*/Build/Products/Debug/JustSpeak.app
 ```
 
 ## Usage

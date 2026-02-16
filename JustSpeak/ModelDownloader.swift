@@ -11,14 +11,17 @@ class ModelDownloader: NSObject {
 
     private let modelName = "ggml-large-v3-turbo.bin"
     private let modelURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin"
+    private let modelDirectory = "just-speak/Models"
+    private let legacyModelDirectory = "VoiceToText/Models"
 
     private var downloadTask: URLSessionDownloadTask?
     private var progressHandler: ((Double) -> Void)?
     private var completionHandler: ((Result<URL, Error>) -> Void)?
+    private var hasAttemptedModelMigration = false
 
     var modelPath: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let modelDir = appSupport.appendingPathComponent("VoiceToText/Models", isDirectory: true)
+        let (modelDir, legacyModelDir) = modelDirectories()
+        migrateLegacyModelIfNeeded(from: legacyModelDir, to: modelDir)
 
         try? FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
 
@@ -56,6 +59,49 @@ class ModelDownloader: NSObject {
     func cancelDownload() {
         downloadTask?.cancel()
         downloadTask = nil
+    }
+
+    private func modelDirectories() -> (URL, URL) {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let currentDirectory = appSupport.appendingPathComponent(modelDirectory, isDirectory: true)
+        let legacyDirectory = appSupport.appendingPathComponent(legacyModelDirectory, isDirectory: true)
+        return (currentDirectory, legacyDirectory)
+    }
+
+    private func migrateLegacyModelIfNeeded(from legacyDirectory: URL, to currentDirectory: URL) {
+        guard !hasAttemptedModelMigration else { return }
+        hasAttemptedModelMigration = true
+
+        let fileManager = FileManager.default
+        let currentModelPath = currentDirectory.appendingPathComponent(modelName)
+        let legacyModelPath = legacyDirectory.appendingPathComponent(modelName)
+
+        guard !fileManager.fileExists(atPath: currentModelPath.path) else { return }
+        guard fileManager.fileExists(atPath: legacyModelPath.path) else { return }
+
+        do {
+            try fileManager.createDirectory(at: currentDirectory, withIntermediateDirectories: true)
+            try fileManager.moveItem(at: legacyModelPath, to: currentModelPath)
+            cleanupIfEmpty(directory: legacyDirectory)
+            cleanupIfEmpty(directory: legacyDirectory.deletingLastPathComponent())
+            print("Migrated model from VoiceToText path to just-speak path")
+        } catch {
+            do {
+                if !fileManager.fileExists(atPath: currentDirectory.path) {
+                    try fileManager.createDirectory(at: currentDirectory, withIntermediateDirectories: true)
+                }
+                try fileManager.copyItem(at: legacyModelPath, to: currentModelPath)
+                print("Copied model from VoiceToText path to just-speak path")
+            } catch {
+                print("Failed to migrate model from legacy path: \(error)")
+            }
+        }
+    }
+
+    private func cleanupIfEmpty(directory: URL) {
+        guard let contents = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { return }
+        guard contents.isEmpty else { return }
+        try? FileManager.default.removeItem(at: directory)
     }
 }
 
