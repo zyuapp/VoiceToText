@@ -15,7 +15,7 @@ struct JustSpeakApp: App {
 
     var body: some Scene {
         Settings {
-            EmptyView()
+            LLMSettingsView()
         }
     }
 }
@@ -25,7 +25,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let audioRecorder = AudioRecorder()
     private let hotkeyManager = HotkeyManager()
     private let transcriptionService = TranscriptionService.shared
+    private let llmPostProcessingService = LLMPostProcessingService.shared
     private let clipboardManager = ClipboardManager.shared
+    private var settingsWindowController: NSWindowController?
     private var recordingStartTime: Date?
     private var downloadProgressMenuItem: NSMenuItem?
     private var accessibilityMenuItem: NSMenuItem?
@@ -88,6 +90,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let audioInputItem = NSMenuItem(title: "Audio Input", action: nil, keyEquivalent: "")
         audioInputItem.submenu = createAudioInputSubmenu()
         menu.addItem(audioInputItem)
+
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        settingsItem.image = nil
+        menu.addItem(settingsItem)
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
@@ -282,6 +289,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.terminate(nil)
     }
 
+    @objc private func openSettings() {
+        if settingsWindowController == nil {
+            settingsWindowController = createSettingsWindowController()
+        }
+
+        guard let window = settingsWindowController?.window else {
+            return
+        }
+
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    private func createSettingsWindowController() -> NSWindowController {
+        let hostingController = NSHostingController(rootView: LLMSettingsView())
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "Settings"
+        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.isReleasedWhenClosed = false
+        window.setContentSize(NSSize(width: 580, height: 360))
+        window.center()
+
+        return NSWindowController(window: window)
+    }
+
     private func setupHotkeyManager() {
         print("🎤 Setting up hotkey manager...")
 
@@ -395,10 +427,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             do {
                 let text = try await transcriptionService.transcribe(audioFile: url)
+                let preparedText = await applyLLMPostProcessingIfEnabled(to: text)
 
                 await MainActor.run {
                     updateStatusIcon()
-                    handleTranscriptionResult(text)
+                    handleTranscriptionResult(preparedText)
                     cleanupRecording(url)
                 }
             } catch {
@@ -417,6 +450,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     cleanupRecording(url)
                 }
             }
+        }
+    }
+
+    private func applyLLMPostProcessingIfEnabled(to text: String) async -> String {
+        guard LLMSettingsStore.shared.isPostProcessingEnabled else {
+            return text
+        }
+
+        do {
+            return try await llmPostProcessingService.postProcess(text)
+        } catch {
+            showNotification(
+                title: "LLM Post-Processing Skipped",
+                body: error.localizedDescription
+            )
+            print("LLM post-processing failed: \(error)")
+            return text
         }
     }
 
