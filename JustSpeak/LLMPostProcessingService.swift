@@ -127,7 +127,7 @@ class LLMPostProcessingService {
     }
 
     private var systemPrompt: String {
-        "You are a dictation post-processor. Keep meaning unchanged. Fix punctuation, capitalization, and minor ASR artifacts. Return only the final text."
+        settingsStore.tone.systemPrompt
     }
 
     private func chatCompletionEndpoint(from baseURL: URL) -> URL {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LLMSettingsView: View {
     @AppStorage(LLMSettingsStore.Keys.isPostProcessingEnabled) private var isPostProcessingEnabled = false
+    @AppStorage(LLMSettingsStore.Keys.tone) private var tone: String = PostProcessingTone.cleanOnly.rawValue
     @AppStorage(LLMSettingsStore.Keys.baseURL) private var baseURL = ""
     @AppStorage(LLMSettingsStore.Keys.model) private var model = ""
 
@@ -15,6 +16,12 @@ struct LLMSettingsView: View {
         Form {
             Section("LLM Post-Processing") {
                 Toggle("Enable post-processing", isOn: $isPostProcessingEnabled)
+                Picker("Tone", selection: $tone) {
+                    ForEach(PostProcessingTone.allCases) { t in
+                        Text(t.displayName).tag(t.rawValue)
+                    }
+                }
+                .disabled(!isPostProcessingEnabled)
                 Text("When enabled, Whisper text is sent to your configured LLM endpoint before paste.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
