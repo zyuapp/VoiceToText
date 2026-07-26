@@ -22,7 +22,7 @@ struct LLMSettingsView: View {
                     }
                 }
                 .disabled(!isPostProcessingEnabled)
-                Text("When enabled, Whisper text is sent to your configured LLM endpoint before paste.")
+                Text("When enabled, transcribed text is sent to your configured LLM endpoint before paste.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Native macOS menu bar app for offline voice dictation powered by Whisper.cpp. Users hold a hotkey to record audio, which is transcribed locally and auto-pasted at the cursor.
+Native macOS menu bar app for offline voice dictation powered by Parakeet on sherpa-onnx. Users hold a hotkey to record audio, which is transcribed locally and auto-pasted at the cursor.
 
 ## Setup and Build Commands
 
 ```bash
-# Build whisper.cpp static libraries (required before first app build)
-./setup-whisper.sh
+# Install sherpa-onnx static libraries (required before first app build)
+./setup-parakeet.sh
 
 # Build the app
 xcodebuild -project JustSpeak.xcodeproj -scheme JustSpeak -configuration Debug clean build
@@ -22,11 +22,11 @@ ls -la ~/Library/Developer/Xcode/DerivedData/JustSpeak-*/Build/Products/Debug/Ju
 open ~/Library/Application\ Support/just-speak/Models/
 ```
 
-If build errors mention missing `libwhisper`/`libggml` symbols, run `./setup-whisper.sh` again.
+If build errors mention missing sherpa-onnx or ONNX Runtime symbols, run `./setup-parakeet.sh` again.
 
 ## Runtime Paths
 
-- Whisper model path: `~/Library/Application Support/just-speak/Models/ggml-large-v3-turbo.bin`
+- Parakeet model path: `~/Library/Application Support/just-speak/Models/parakeet/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/`
 - Recordings are written to `FileManager.default.temporaryDirectory` as `recording_<timestamp>.wav`
 - Temporary recordings are deleted after transcription or cancellation
 
@@ -43,8 +43,9 @@ If build errors mention missing `libwhisper`/`libggml` symbols, run `./setup-whi
 - `HotkeyManager` (`HotkeyManager.swift`): global event tap for Right Command down/up and Escape cancel
 - `AudioRecorder` (`AudioRecorder.swift`): `AVAudioRecorder` wrapper plus CoreAudio input-device selection
 - `TranscriptionService` (`TranscriptionService.swift`): model lifecycle and async transcription entry point
-- `ModelDownloader` (`ModelDownloader.swift`): first-run model download from Hugging Face
-- `WhisperWrapper` (`WhisperWrapper.swift`): C API bridge and inference parameters for whisper.cpp
+- `ModelDownloader` (`ModelDownloader.swift`): verified first-run model download and installation
+- `ParakeetWrapper` (`ParakeetWrapper.swift`): audio loading and Swift interface to Parakeet
+- `ParakeetBridge` (`ParakeetBridge.mm`): sherpa-onnx C API configuration and inference
 - `ClipboardManager` (`ClipboardManager.swift`): copy result and synthesize Command+V paste
 
 **Function Size Constraint:**
@@ -53,7 +54,7 @@ Keep functions small and single-purpose. Break large functions into multiple foc
 ## Critical Requirements
 
 **Audio Format (Non-negotiable):**
-Must be **16kHz mono WAV** for Whisper.cpp compatibility:
+Must be **16kHz mono WAV** for Parakeet compatibility:
 ```swift
 AVSampleRateKey: 16000.0
 AVNumberOfChannelsKey: 1
@@ -78,6 +79,6 @@ AVFormatIDKey: kAudioFormatLinearPCM
 
 ## Non-Obvious Gotchas
 
-- First launch downloads a large model (~1.6 GB). App is not transcription-ready until download and `TranscriptionService.initialize()` complete.
+- First launch downloads the Parakeet archive (~460 MB). App is not transcription-ready until download, verification, extraction, and `TranscriptionService.initialize()` complete.
 - `JustSpeakApp.handleHotkeyUp()` warns when duration is over 60s, but does not trim audio yet. If you change duration UX, keep behavior and messaging aligned.
-- `Whisper.xcconfig` links static libs from `whisper.cpp/build/...`; if you clean that folder, app linking will fail until rebuilt.
+- `Parakeet.xcconfig` links static libs from `sherpa-onnx/lib`; if that folder is removed, run `./setup-parakeet.sh` again.

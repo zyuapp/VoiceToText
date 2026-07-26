@@ -6,10 +6,10 @@ CONFIGURATION ?= Debug
 DERIVED_DATA := build
 APP_PATH := $(DERIVED_DATA)/Build/Products/$(CONFIGURATION)/JustSpeak.app
 
-.PHONY: whisper build run open clean rebuild
+.PHONY: parakeet build run open clean rebuild
 
-whisper:
-	./setup-whisper.sh
+parakeet:
+	./setup-parakeet.sh
 
 build:
 	xcodebuild -project "$(PROJECT)" -scheme "$(SCHEME)" -configuration "$(CONFIGURATION)" -derivedDataPath "$(DERIVED_DATA)" build

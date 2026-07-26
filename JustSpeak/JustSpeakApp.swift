@@ -243,21 +243,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupTranscriptionService() {
         if transcriptionService.isModelDownloaded {
-            do {
-                try transcriptionService.initialize()
-                print("Transcription service initialized")
-            } catch {
-                print("Failed to initialize transcription service: \(error)")
-                showNotification(
-                    title: "Transcription Unavailable",
-                    body: "Failed to initialize Whisper model"
-                )
-            }
+            initializeTranscriptionService()
         } else {
             updateStatusIcon(downloading: true)
             showNotification(
                 title: "Downloading Model",
-                body: "First time setup: downloading Whisper model (~1.6GB)"
+                body: "First time setup: downloading Parakeet model (~460 MB)"
             )
 
             transcriptionService.downloadModelIfNeeded { [weak self] progress in
@@ -272,15 +263,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     print("Model downloaded and initialized successfully")
                     self?.showNotification(
                         title: "Setup Complete",
-                        body: "Whisper model ready for transcription"
+                        body: "Parakeet model ready for transcription"
                     )
                 case .failure(let error):
                     print("Model download failed: \(error)")
                     self?.showNotification(
                         title: "Download Failed",
-                        body: "Failed to download Whisper model: \(error.localizedDescription)"
+                        body: "Failed to download Parakeet model: \(error.localizedDescription)"
                     )
                 }
+            }
+        }
+    }
+
+    private func initializeTranscriptionService() {
+        updateStatusIcon(downloading: true)
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                try await transcriptionService.initialize()
+                print("Transcription service initialized")
+                updateStatusIcon(downloading: false)
+            } catch {
+                print("Failed to initialize transcription service: \(error)")
+                updateStatusIcon(error: true)
+                showNotification(
+                    title: "Transcription Unavailable",
+                    body: "Failed to initialize Parakeet model"
+                )
             }
         }
     }
@@ -412,7 +423,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard transcriptionService.isReady else {
             showNotification(
                 title: "Transcription Unavailable",
-                body: "Whisper model not ready. Please wait for download to complete."
+                body: "Parakeet model not ready. Please wait for download to complete."
             )
             updateStatusIcon(error: true)
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
