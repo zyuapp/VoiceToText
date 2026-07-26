@@ -1,35 +1,56 @@
+import CryptoKit
 import Foundation
 
 enum ModelDownloadError: Error {
-    case downloadFailed(String)
     case invalidURL
-    case fileWriteFailed
+    case downloadFailed(String)
+    case integrityCheckFailed
+    case extractionFailed(String)
+    case invalidArchive
+    case fileWriteFailed(String)
 }
 
-class ModelDownloader: NSObject {
-    static let shared = ModelDownloader()
+extension ModelDownloadError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            return "The Parakeet model URL is invalid."
+        case .downloadFailed(let message):
+            return "Parakeet model download failed: \(message)"
+        case .integrityCheckFailed:
+            return "The downloaded Parakeet model failed its integrity check."
+        case .extractionFailed(let message):
+            return "Could not extract the Parakeet model: \(message)"
+        case .invalidArchive:
+            return "The Parakeet model archive is missing required files."
+        case .fileWriteFailed(let message):
+            return "Could not install the Parakeet model: \(message)"
+        }
+    }
+}
 
-    private let modelName = "ggml-large-v3-turbo.bin"
-    private let modelURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin"
-    private let modelDirectory = "just-speak/Models"
-    private let legacyModelDirectory = "VoiceToText/Models"
+final class ModelDownloader: NSObject {
+    static let shared = ModelDownloader()
 
     private var downloadTask: URLSessionDownloadTask?
     private var progressHandler: ((Double) -> Void)?
     private var completionHandler: ((Result<URL, Error>) -> Void)?
-    private var hasAttemptedModelMigration = false
 
-    var modelPath: URL {
-        let (modelDir, legacyModelDir) = modelDirectories()
-        migrateLegacyModelIfNeeded(from: legacyModelDir, to: modelDir)
+    var modelDirectory: URL {
+        appSupportDirectory
+            .appendingPathComponent("Models", isDirectory: true)
+            .appendingPathComponent("parakeet", isDirectory: true)
+            .appendingPathComponent(ParakeetModel.id, isDirectory: true)
+    }
 
-        try? FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
-
-        return modelDir.appendingPathComponent(modelName)
+    var modelFiles: ParakeetModelFiles {
+        ParakeetModel.files(in: modelDirectory)
     }
 
     var isModelDownloaded: Bool {
-        FileManager.default.fileExists(atPath: modelPath.path)
+        modelFiles.all.allSatisfy {
+            FileManager.default.fileExists(atPath: $0.path)
+        }
     }
 
     func downloadModel(
@@ -37,21 +58,23 @@ class ModelDownloader: NSObject {
         completion: @escaping (Result<URL, Error>) -> Void
     ) {
         if isModelDownloaded {
-            completion(.success(modelPath))
+            completion(.success(modelDirectory))
             return
         }
 
-        guard let url = URL(string: modelURL) else {
+        guard let url = URL(string: ParakeetModel.archiveURLString) else {
             completion(.failure(ModelDownloadError.invalidURL))
             return
         }
 
-        self.progressHandler = progress
-        self.completionHandler = completion
+        progressHandler = progress
+        completionHandler = completion
 
-        let config = URLSessionConfiguration.default
-        let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
-
+        let session = URLSession(
+            configuration: .default,
+            delegate: self,
+            delegateQueue: nil
+        )
         downloadTask = session.downloadTask(with: url)
         downloadTask?.resume()
     }
@@ -61,47 +84,115 @@ class ModelDownloader: NSObject {
         downloadTask = nil
     }
 
-    private func modelDirectories() -> (URL, URL) {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let currentDirectory = appSupport.appendingPathComponent(modelDirectory, isDirectory: true)
-        let legacyDirectory = appSupport.appendingPathComponent(legacyModelDirectory, isDirectory: true)
-        return (currentDirectory, legacyDirectory)
+    private var appSupportDirectory: URL {
+        FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("just-speak", isDirectory: true)
     }
 
-    private func migrateLegacyModelIfNeeded(from legacyDirectory: URL, to currentDirectory: URL) {
-        guard !hasAttemptedModelMigration else { return }
-        hasAttemptedModelMigration = true
-
+    private func installModel(from downloadedArchive: URL) throws {
         let fileManager = FileManager.default
-        let currentModelPath = currentDirectory.appendingPathComponent(modelName)
-        let legacyModelPath = legacyDirectory.appendingPathComponent(modelName)
+        let downloadsDirectory = appSupportDirectory
+            .appendingPathComponent("Models/.downloads", isDirectory: true)
+        let archive = downloadsDirectory
+            .appendingPathComponent("\(ParakeetModel.id).tar.bz2")
+        let extractingDirectory = downloadsDirectory
+            .appendingPathComponent("\(ParakeetModel.id).extracting", isDirectory: true)
+        let stagingDirectory = downloadsDirectory
+            .appendingPathComponent("\(ParakeetModel.id).installing", isDirectory: true)
 
-        guard !fileManager.fileExists(atPath: currentModelPath.path) else { return }
-        guard fileManager.fileExists(atPath: legacyModelPath.path) else { return }
+        try fileManager.createDirectory(at: downloadsDirectory, withIntermediateDirectories: true)
+        removeIfPresent(archive)
+        removeIfPresent(extractingDirectory)
+        removeIfPresent(stagingDirectory)
 
         do {
-            try fileManager.createDirectory(at: currentDirectory, withIntermediateDirectories: true)
-            try fileManager.moveItem(at: legacyModelPath, to: currentModelPath)
-            cleanupIfEmpty(directory: legacyDirectory)
-            cleanupIfEmpty(directory: legacyDirectory.deletingLastPathComponent())
-            print("Migrated model from VoiceToText path to just-speak path")
-        } catch {
-            do {
-                if !fileManager.fileExists(atPath: currentDirectory.path) {
-                    try fileManager.createDirectory(at: currentDirectory, withIntermediateDirectories: true)
-                }
-                try fileManager.copyItem(at: legacyModelPath, to: currentModelPath)
-                print("Copied model from VoiceToText path to just-speak path")
-            } catch {
-                print("Failed to migrate model from legacy path: \(error)")
+            try fileManager.moveItem(at: downloadedArchive, to: archive)
+            guard try sha256(of: archive) == ParakeetModel.archiveSHA256 else {
+                throw ModelDownloadError.integrityCheckFailed
             }
+
+            try fileManager.createDirectory(
+                at: extractingDirectory,
+                withIntermediateDirectories: true
+            )
+            try extract(archive: archive, to: extractingDirectory)
+            try stageModel(from: extractingDirectory, at: stagingDirectory)
+
+            try fileManager.createDirectory(
+                at: modelDirectory.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            removeIfPresent(modelDirectory)
+            try fileManager.moveItem(at: stagingDirectory, to: modelDirectory)
+        } catch let error as ModelDownloadError {
+            throw error
+        } catch {
+            throw ModelDownloadError.fileWriteFailed(error.localizedDescription)
+        }
+
+        removeIfPresent(archive)
+        removeIfPresent(extractingDirectory)
+    }
+
+    private func extract(archive: URL, to destination: URL) throws {
+        let process = Process()
+        let errorPipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
+        process.arguments = ["-xjf", archive.path, "-C", destination.path]
+        process.standardError = errorPipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            throw ModelDownloadError.extractionFailed(error.localizedDescription)
+        }
+
+        guard process.terminationStatus == 0 else {
+            let data = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let message = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            throw ModelDownloadError.extractionFailed(message ?? "tar exited with an error")
         }
     }
 
-    private func cleanupIfEmpty(directory: URL) {
-        guard let contents = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { return }
-        guard contents.isEmpty else { return }
-        try? FileManager.default.removeItem(at: directory)
+    private func stageModel(from extractingDirectory: URL, at stagingDirectory: URL) throws {
+        let fileManager = FileManager.default
+        let nestedDirectory = extractingDirectory
+            .appendingPathComponent(ParakeetModel.id, isDirectory: true)
+        let sourceDirectory = fileManager.fileExists(atPath: nestedDirectory.path)
+            ? nestedDirectory
+            : extractingDirectory
+
+        let sourceFiles = ParakeetModel.files(in: sourceDirectory).all
+        guard sourceFiles.allSatisfy({ fileManager.fileExists(atPath: $0.path) }) else {
+            throw ModelDownloadError.invalidArchive
+        }
+
+        try fileManager.createDirectory(at: stagingDirectory, withIntermediateDirectories: true)
+        for source in sourceFiles {
+            try fileManager.copyItem(
+                at: source,
+                to: stagingDirectory.appendingPathComponent(source.lastPathComponent)
+            )
+        }
+    }
+
+    private func sha256(of file: URL) throws -> String {
+        let handle = try FileHandle(forReadingFrom: file)
+        defer { try? handle.close() }
+
+        var hasher = SHA256()
+        while let data = try handle.read(upToCount: 1024 * 1024), !data.isEmpty {
+            hasher.update(data: data)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func removeIfPresent(_ url: URL) {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 }
 
@@ -112,22 +203,14 @@ extension ModelDownloader: URLSessionDownloadDelegate {
         didFinishDownloadingTo location: URL
     ) {
         do {
-            let modelDir = modelPath.deletingLastPathComponent()
-            try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
-
-            if FileManager.default.fileExists(atPath: modelPath.path) {
-                try FileManager.default.removeItem(at: modelPath)
-            }
-
-            try FileManager.default.moveItem(at: location, to: modelPath)
-
+            try installModel(from: location)
             DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                self.completionHandler?(.success(self.modelPath))
+                guard let self else { return }
+                self.completionHandler?(.success(self.modelDirectory))
             }
         } catch {
             DispatchQueue.main.async { [weak self] in
-                self?.completionHandler?(.failure(ModelDownloadError.fileWriteFailed))
+                self?.completionHandler?(.failure(error))
             }
         }
     }
@@ -139,6 +222,7 @@ extension ModelDownloader: URLSessionDownloadDelegate {
         totalBytesWritten: Int64,
         totalBytesExpectedToWrite: Int64
     ) {
+        guard totalBytesExpectedToWrite > 0 else { return }
         let progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
 
         DispatchQueue.main.async { [weak self] in
@@ -151,10 +235,11 @@ extension ModelDownloader: URLSessionDownloadDelegate {
         task: URLSessionTask,
         didCompleteWithError error: Error?
     ) {
-        if let error = error {
-            DispatchQueue.main.async { [weak self] in
-                self?.completionHandler?(.failure(ModelDownloadError.downloadFailed(error.localizedDescription)))
-            }
+        guard let error else { return }
+        DispatchQueue.main.async { [weak self] in
+            self?.completionHandler?(
+                .failure(ModelDownloadError.downloadFailed(error.localizedDescription))
+            )
         }
     }
 }

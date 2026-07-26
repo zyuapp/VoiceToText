@@ -114,8 +114,9 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
-# Whisper models (large binary files)
+# Speech models (large binary files)
 *.bin
+*.onnx
 Models/
 
 # Temporary audio files
@@ -126,8 +127,8 @@ Recordings/
 # Claude Code local settings
 .claude/settings.local.json
 
-# Whisper.cpp external dependency
-whisper.cpp/
+# Native speech runtime dependencies
+sherpa-onnx/
 
 # Xcode project backup
 *.pbxproj.backup

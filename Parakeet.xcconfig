@@ -1,0 +1,8 @@
+// sherpa-onnx integration configuration.
+// The pinned static runtime is installed by setup-parakeet.sh.
+
+SWIFT_OBJC_BRIDGING_HEADER = JustSpeak/JustSpeak-Bridging-Header.h
+ENABLE_DEBUG_DYLIB = NO
+DEAD_CODE_STRIPPING = YES
+
+OTHER_LDFLAGS = $(inherited) -Wl,-dead_strip -Wl,-filelist,$(PROJECT_DIR)/ParakeetLibraries.filelist -framework Foundation

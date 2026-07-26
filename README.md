@@ -2,17 +2,16 @@
 
 > Built with [Claude Code](https://claude.ai/code) - AI-assisted development from concept to completion. 🤖
 
-A lightweight macOS menu bar app for offline voice dictation, with optional cloud LLM post-processing. Hold Command, speak, and your words appear at your cursor.
+A lightweight macOS menu bar app for fully offline voice dictation. Hold Right Command, speak, and your words appear at your cursor.
 
 ## Features
 
-- **Offline Transcription** - Core speech-to-text runs locally with Whisper.cpp
+- **Offline Transcription** - Core speech-to-text runs locally with Parakeet on sherpa-onnx
 - **System-Wide** - Works in any application where you can type
-- **Simple Hotkey** - Hold Command to record, release to transcribe and paste
+- **Simple Hotkey** - Hold Right Command to record, release to transcribe and paste
 - **Cancel Anytime** - Press Escape while holding to cancel recording
-- **Optional LLM Cleanup** - Route transcribed text to an OpenAI-compatible endpoint before paste
-- **Privacy Control** - Keep everything local or opt in to cloud post-processing
-- **Accurate** - Powered by OpenAI's Whisper large-v3-turbo model
+- **Private** - Audio and transcription stay on your Mac
+- **Accurate** - Powered by NVIDIA's Parakeet TDT 0.6B v2 model
 - **Native macOS** - Built with Swift, optimized for Apple Silicon
 
 ## Requirements
@@ -41,7 +40,7 @@ Note: builds are currently unsigned and not notarized, so macOS may show a secur
 # Clone and setup
 git clone https://github.com/zyuapp/just-speak.git
 cd just-speak
-./setup-whisper.sh
+./setup-parakeet.sh
 
 # Build
 xcodebuild -project JustSpeak.xcodeproj -scheme JustSpeak -configuration Debug clean build
@@ -52,24 +51,25 @@ ls -la ~/Library/Developer/Xcode/DerivedData/JustSpeak-*/Build/Products/Debug/Ju
 
 ## Usage
 
-1. **First Launch** - Grant microphone permission when prompted, download Whisper model from menu
-2. **Record** - Hold Command key (⌘) and speak
-3. **Optional LLM Setup** - Open app menu > Settings... and add Base URL, Model, and API key
-4. **Transcribe** - Release Command to stop and auto-paste
-5. **Cancel** - Press Escape while holding to abort
+1. **First Launch** - Grant microphone permission and wait for the Parakeet model download
+2. **Record** - Hold the Right Command key (⌘) and speak
+3. **Transcribe** - Release Command to stop and auto-paste
+4. **Cancel** - Press Escape while holding to abort
 
 ## Tech Stack
 
 - **SwiftUI + AppKit** - Menu bar app with NSApplicationDelegateAdaptor
 - **AVFoundation** - Native audio recording (16kHz mono WAV)
-- **Whisper.cpp** - Local transcription with Metal acceleration
-- **Sandboxed** - Minimal permissions, secure by design
+- **sherpa-onnx** - Local Parakeet inference through ONNX Runtime
+- **Native Integration** - Uses macOS microphone and accessibility APIs directly
 
 ## Development
 
 See [CLAUDE.md](CLAUDE.md) for architecture details and development guidelines.
+Third-party attributions and license texts are bundled with the app under
+[`JustSpeak/ThirdPartyLicenses`](JustSpeak/ThirdPartyLicenses).
 
 ## Acknowledgments
 
-- [Whisper.cpp](https://github.com/ggerganov/whisper.cpp) - High-performance inference of OpenAI's Whisper
-- [OpenAI Whisper](https://github.com/openai/whisper) - Robust speech recognition model
+- [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) - On-device speech recognition runtime
+- [NVIDIA Parakeet TDT 0.6B v2](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2) - English speech recognition model

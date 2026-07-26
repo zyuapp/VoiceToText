@@ -15,7 +15,7 @@ struct JustSpeakApp: App {
 
     var body: some Scene {
         Settings {
-            LLMSettingsView()
+            EmptyView()
         }
     }
 }
@@ -25,9 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let audioRecorder = AudioRecorder()
     private let hotkeyManager = HotkeyManager()
     private let transcriptionService = TranscriptionService.shared
-    private let llmPostProcessingService = LLMPostProcessingService.shared
     private let clipboardManager = ClipboardManager.shared
-    private var settingsWindowController: NSWindowController?
     private var recordingStartTime: Date?
     private var downloadProgressMenuItem: NSMenuItem?
     private var accessibilityMenuItem: NSMenuItem?
@@ -90,11 +88,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let audioInputItem = NSMenuItem(title: "Audio Input", action: nil, keyEquivalent: "")
         audioInputItem.submenu = createAudioInputSubmenu()
         menu.addItem(audioInputItem)
-
-        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
-        settingsItem.target = self
-        settingsItem.image = nil
-        menu.addItem(settingsItem)
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
@@ -243,21 +236,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupTranscriptionService() {
         if transcriptionService.isModelDownloaded {
-            do {
-                try transcriptionService.initialize()
-                print("Transcription service initialized")
-            } catch {
-                print("Failed to initialize transcription service: \(error)")
-                showNotification(
-                    title: "Transcription Unavailable",
-                    body: "Failed to initialize Whisper model"
-                )
-            }
+            initializeTranscriptionService()
         } else {
             updateStatusIcon(downloading: true)
             showNotification(
                 title: "Downloading Model",
-                body: "First time setup: downloading Whisper model (~1.6GB)"
+                body: "First time setup: downloading Parakeet model (~460 MB)"
             )
 
             transcriptionService.downloadModelIfNeeded { [weak self] progress in
@@ -272,46 +256,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     print("Model downloaded and initialized successfully")
                     self?.showNotification(
                         title: "Setup Complete",
-                        body: "Whisper model ready for transcription"
+                        body: "Parakeet model ready for transcription"
                     )
                 case .failure(let error):
                     print("Model download failed: \(error)")
                     self?.showNotification(
                         title: "Download Failed",
-                        body: "Failed to download Whisper model: \(error.localizedDescription)"
+                        body: "Failed to download Parakeet model: \(error.localizedDescription)"
                     )
                 }
             }
         }
     }
 
+    private func initializeTranscriptionService() {
+        updateStatusIcon(downloading: true)
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                try await transcriptionService.initialize()
+                print("Transcription service initialized")
+                updateStatusIcon(downloading: false)
+            } catch {
+                print("Failed to initialize transcription service: \(error)")
+                updateStatusIcon(error: true)
+                showNotification(
+                    title: "Transcription Unavailable",
+                    body: "Failed to initialize Parakeet model"
+                )
+            }
+        }
+    }
+
     @objc private func quit() {
         NSApplication.shared.terminate(nil)
-    }
-
-    @objc private func openSettings() {
-        if settingsWindowController == nil {
-            settingsWindowController = createSettingsWindowController()
-        }
-
-        guard let window = settingsWindowController?.window else {
-            return
-        }
-
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
-    }
-
-    private func createSettingsWindowController() -> NSWindowController {
-        let hostingController = NSHostingController(rootView: LLMSettingsView())
-        let window = NSWindow(contentViewController: hostingController)
-        window.title = "Settings"
-        window.styleMask = [.titled, .closable, .miniaturizable]
-        window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: 580, height: 360))
-        window.center()
-
-        return NSWindowController(window: window)
     }
 
     private func setupHotkeyManager() {
@@ -412,7 +391,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard transcriptionService.isReady else {
             showNotification(
                 title: "Transcription Unavailable",
-                body: "Whisper model not ready. Please wait for download to complete."
+                body: "Parakeet model not ready. Please wait for download to complete."
             )
             updateStatusIcon(error: true)
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
@@ -427,11 +406,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             do {
                 let text = try await transcriptionService.transcribe(audioFile: url)
-                let preparedText = await applyLLMPostProcessingIfEnabled(to: text)
 
                 await MainActor.run {
                     updateStatusIcon()
-                    handleTranscriptionResult(preparedText)
+                    handleTranscriptionResult(text)
                     cleanupRecording(url)
                 }
             } catch {
@@ -450,23 +428,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     cleanupRecording(url)
                 }
             }
-        }
-    }
-
-    private func applyLLMPostProcessingIfEnabled(to text: String) async -> String {
-        guard LLMSettingsStore.shared.isPostProcessingEnabled else {
-            return text
-        }
-
-        do {
-            return try await llmPostProcessingService.postProcess(text)
-        } catch {
-            showNotification(
-                title: "LLM Post-Processing Skipped",
-                body: error.localizedDescription
-            )
-            print("LLM post-processing failed: \(error)")
-            return text
         }
     }
 
