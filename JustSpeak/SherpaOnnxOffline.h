@@ -75,7 +75,7 @@ typedef struct { const char *model; } SherpaOnnxOfflineMedAsrCtcModelConfig;
 
 typedef struct {
     const char *encoder_adaptor;
-    const char *llm;
+    const char *language_model;
     const char *embedding;
     const char *tokenizer;
     const char *system_prompt;

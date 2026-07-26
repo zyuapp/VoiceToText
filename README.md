@@ -2,7 +2,7 @@
 
 > Built with [Claude Code](https://claude.ai/code) - AI-assisted development from concept to completion. 🤖
 
-A lightweight macOS menu bar app for offline voice dictation, with optional cloud LLM post-processing. Hold Right Command, speak, and your words appear at your cursor.
+A lightweight macOS menu bar app for fully offline voice dictation. Hold Right Command, speak, and your words appear at your cursor.
 
 ## Features
 
@@ -10,8 +10,7 @@ A lightweight macOS menu bar app for offline voice dictation, with optional clou
 - **System-Wide** - Works in any application where you can type
 - **Simple Hotkey** - Hold Right Command to record, release to transcribe and paste
 - **Cancel Anytime** - Press Escape while holding to cancel recording
-- **Optional LLM Cleanup** - Route transcribed text to an OpenAI-compatible endpoint before paste
-- **Privacy Control** - Keep everything local or opt in to cloud post-processing
+- **Private** - Audio and transcription stay on your Mac
 - **Accurate** - Powered by NVIDIA's Parakeet TDT 0.6B v2 model
 - **Native macOS** - Built with Swift, optimized for Apple Silicon
 
@@ -54,9 +53,8 @@ ls -la ~/Library/Developer/Xcode/DerivedData/JustSpeak-*/Build/Products/Debug/Ju
 
 1. **First Launch** - Grant microphone permission and wait for the Parakeet model download
 2. **Record** - Hold the Right Command key (⌘) and speak
-3. **Optional LLM Setup** - Open app menu > Settings... and add Base URL, Model, and API key
-4. **Transcribe** - Release Command to stop and auto-paste
-5. **Cancel** - Press Escape while holding to abort
+3. **Transcribe** - Release Command to stop and auto-paste
+4. **Cancel** - Press Escape while holding to abort
 
 ## Tech Stack
 
