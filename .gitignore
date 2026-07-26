@@ -128,7 +128,6 @@ Recordings/
 .claude/settings.local.json
 
 # Native speech runtime dependencies
-whisper.cpp/
 sherpa-onnx/
 
 # Xcode project backup

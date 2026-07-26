@@ -35,7 +35,7 @@ typedef struct {
     int32_t tail_paddings;
     int32_t enable_token_timestamps;
     int32_t enable_segment_timestamps;
-} SherpaOnnxOfflineWhisperModelConfig;
+} SherpaOnnxOfflineReservedEncoderDecoderModelConfig;
 
 typedef struct { const char *model; } SherpaOnnxOfflineTdnnModelConfig;
 
@@ -116,7 +116,7 @@ typedef struct {
     SherpaOnnxOfflineTransducerModelConfig transducer;
     SherpaOnnxOfflineParaformerModelConfig paraformer;
     SherpaOnnxOfflineNemoEncDecCtcModelConfig nemo_ctc;
-    SherpaOnnxOfflineWhisperModelConfig whisper;
+    SherpaOnnxOfflineReservedEncoderDecoderModelConfig reserved_encoder_decoder;
     SherpaOnnxOfflineTdnnModelConfig tdnn;
     const char *tokens;
     int32_t num_threads;
