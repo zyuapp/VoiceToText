@@ -12,11 +12,11 @@ Native macOS menu bar app for offline voice dictation powered by Parakeet on she
 # Install sherpa-onnx static libraries (required before first app build)
 ./setup-parakeet.sh
 
-# Build the app
-xcodebuild -project JustSpeak.xcodeproj -scheme JustSpeak -configuration Debug clean build
+# Build the app with a dynamically selected local signing identity
+make build
 
-# Find built app
-ls -la ~/Library/Developer/Xcode/DerivedData/JustSpeak-*/Build/Products/Debug/JustSpeak.app
+# Install a release build
+make install
 
 # Open downloaded model directory
 open ~/Library/Application\ Support/just-speak/Models/

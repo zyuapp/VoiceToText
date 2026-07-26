@@ -42,12 +42,23 @@ git clone https://github.com/zyuapp/just-speak.git
 cd just-speak
 ./setup-parakeet.sh
 
-# Build
-xcodebuild -project JustSpeak.xcodeproj -scheme JustSpeak -configuration Debug clean build
+# Build with local development signing
+make build
 
-# Find built app
-ls -la ~/Library/Developer/Xcode/DerivedData/JustSpeak-*/Build/Products/Debug/JustSpeak.app
+# Install a release build in /Applications
+make install
 ```
+
+The Makefile discovers a valid Apple Development certificate from your local
+Keychain and uses it without storing its identity in the repository. Keeping
+the certificate-backed code identity and `com.zyu.just-speak` bundle identifier
+stable allows microphone and Accessibility grants to survive rebuilds. If no
+suitable certificate is available, the build safely uses ad-hoc signing and
+warns that macOS may request those permissions again.
+
+This is only for local build and install workflows. It is not Developer ID or
+App Store signing, and it does not notarize the app or change how public
+releases are packaged.
 
 ## Usage
 

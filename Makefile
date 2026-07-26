@@ -16,7 +16,9 @@ parakeet:
 build:
 	mkdir -p "$(DERIVED_DATA)"
 	touch "$(DERIVED_DATA)/.metadata_never_index"
-	xcodebuild -project "$(PROJECT)" -scheme "$(SCHEME)" -configuration "$(CONFIGURATION)" -derivedDataPath "$(DERIVED_DATA)" build
+	xcodebuild -quiet -project "$(PROJECT)" -scheme "$(SCHEME)" -configuration "$(CONFIGURATION)" -derivedDataPath "$(DERIVED_DATA)" build
+	./scripts/sign-local.sh "$(APP_PATH)"
+	./scripts/verify-local-signing.sh "$(APP_PATH)"
 
 release:
 	$(MAKE) build CONFIGURATION=Release
