@@ -62,7 +62,8 @@ AVFormatIDKey: kAudioFormatLinearPCM
 ```
 
 **Hotkey Behavior:**
-- Record trigger is currently Right Command only (`targetKeyCode = 54`)
+- Record trigger defaults to Right Command and can be changed in Settings
+- Standalone modifiers, modifier-key combinations, and function keys are supported
 - Release stops recording; Escape while held cancels recording
 
 **Permissions:**

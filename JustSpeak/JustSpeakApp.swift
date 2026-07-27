@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import Combine
 import UserNotifications
 
 @main
@@ -15,25 +16,39 @@ struct JustSpeakApp: App {
 
     var body: some Scene {
         Settings {
-            EmptyView()
+            ShortcutSettingsView(
+                store: appDelegate.shortcutStore,
+                captureController: appDelegate.shortcutCaptureController
+            )
         }
     }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    let shortcutStore = RecordingShortcutStore()
+    lazy var shortcutCaptureController = ShortcutCaptureController(
+        store: shortcutStore
+    )
+
     private var statusItem: NSStatusItem?
     private let audioRecorder = AudioRecorder()
-    private let hotkeyManager = HotkeyManager()
+    private lazy var hotkeyManager = HotkeyManager(shortcut: shortcutStore.shortcut)
     private let transcriptionService = TranscriptionService.shared
     private let clipboardManager = ClipboardManager.shared
     private let transcriptHistory = TranscriptHistoryStore()
     private let recordingOverlay = RecordingOverlayController()
     private let recordingCuePlayer = RecordingCuePlayer()
+    private lazy var shortcutSettingsWindowController = ShortcutSettingsWindowController(
+        store: shortcutStore,
+        captureController: shortcutCaptureController
+    )
     private var isRecordingHotkeyHeld = false
     private var recordingStartTime: Date?
     private var downloadProgressMenuItem: NSMenuItem?
     private var accessibilityMenuItem: NSMenuItem?
     private let transcriptHistoryMenu = NSMenu()
+    private var shortcutMenuItem: NSMenuItem?
+    private var subscriptions = Set<AnyCancellable>()
     private static let selectedDeviceKey = "selectedAudioInputDevice"
     private static let didMigratePreferencesKey = "didMigrateLegacyPreferences"
     private static let legacyBundleIdentifier = "com.zyu.VoiceToText"
@@ -41,6 +56,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         requestNotificationPermission()
         migrateLegacyPreferencesIfNeeded()
+        observeShortcutSettings()
         setupStatusItem()
         setupMenus()
         setupHotkeyManager()
@@ -87,6 +103,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupMenus() {
         let menu = NSMenu()
+
+        shortcutMenuItem = NSMenuItem(
+            title: shortcutMenuTitle,
+            action: nil,
+            keyEquivalent: ""
+        )
+        shortcutMenuItem?.isEnabled = false
+        menu.addItem(shortcutMenuItem!)
+
+        let changeShortcutItem = NSMenuItem(
+            title: "Change Shortcut…",
+            action: #selector(openShortcutSettings),
+            keyEquivalent: ""
+        )
+        changeShortcutItem.target = self
+        menu.addItem(changeShortcutItem)
+
+        menu.addItem(NSMenuItem.separator())
 
         accessibilityMenuItem = createAccessibilityMenuItem()
         menu.addItem(accessibilityMenuItem!)
@@ -169,6 +203,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func clearTranscriptHistory() {
         transcriptHistory.clear()
         refreshTranscriptHistoryMenu()
+    }
+
+    private var shortcutMenuTitle: String {
+        "Shortcut: \(shortcutStore.shortcut.displayName)"
+    }
+
+    private func observeShortcutSettings() {
+        shortcutStore.$shortcut
+            .dropFirst()
+            .sink { [weak self] shortcut in
+                self?.hotkeyManager.updateShortcut(shortcut)
+                self?.shortcutMenuItem?.title = "Shortcut: \(shortcut.displayName)"
+            }
+            .store(in: &subscriptions)
+
+        shortcutCaptureController.$isCapturing
+            .dropFirst()
+            .removeDuplicates()
+            .sink { [weak self] isCapturing in
+                self?.hotkeyManager.setSuspended(isCapturing)
+            }
+            .store(in: &subscriptions)
+    }
+
+    @objc private func openShortcutSettings() {
+        shortcutSettingsWindowController.present()
     }
 
     private func createAudioInputSubmenu() -> NSMenu {
@@ -385,20 +445,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         hotkeyManager.onPermissionGranted = { [weak self] in
-            print("✅ Hotkey listener ready - Press Right Command to record")
             self?.updateAccessibilityMenuItem()
-            self?.showNotification(
-                title: "Voice Dictation Ready",
-                body: "Hold Right Command (⌘) to record, press Escape to cancel"
-            )
+            self?.announceHotkeyReady()
         }
 
         if hotkeyManager.start() {
-            print("✅ Hotkey listener ready - Press Right Command to record")
-            showNotification(
-                title: "Voice Dictation Ready",
-                body: "Hold Right Command (⌘) to record, press Escape to cancel"
-            )
+            announceHotkeyReady()
         } else {
             print("❌ Failed to start hotkey listener - waiting for permission")
             showNotification(
@@ -406,6 +458,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 body: "Grant Accessibility permission in System Settings, then wait a moment - no restart needed!"
             )
         }
+    }
+
+    private func announceHotkeyReady() {
+        let shortcutName = shortcutStore.shortcut.displayName
+        print("✅ Hotkey listener ready - Hold \(shortcutName) to record")
+        showNotification(
+            title: "Voice Dictation Ready",
+            body: "Hold \(shortcutName) to record, press Escape to cancel"
+        )
     }
 
     private func handleHotkeyDown() {

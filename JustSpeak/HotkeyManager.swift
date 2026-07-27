@@ -1,22 +1,33 @@
-import Foundation
-import CoreGraphics
 import ApplicationServices
+import CoreGraphics
+import Foundation
 
-class HotkeyManager {
+final class HotkeyManager {
+    private enum ActivationState {
+        case idle
+        case recording
+        case cancelled
+    }
+
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var permissionCheckTimer: Timer?
+    private var shortcut: RecordingShortcut
+    private var activationState = ActivationState.idle
+    private var suppressedPrimaryKeyCode: CGKeyCode?
+    private var shouldSuppressEscapeKeyUp = false
+    private var hasPromptedForPermission = false
+    private var isRunning = false
+    private var isSuspended = false
 
     var onKeyDown: (() -> Void)?
     var onKeyUp: (() -> Void)?
     var onCancelRequested: (() -> Void)?
     var onPermissionGranted: (() -> Void)?
 
-    private let targetKeyCode: CGKeyCode = 54
-    private let escapeKeyCode: CGKeyCode = 53
-    private var isTargetKeyPressed = false
-    private var hasPromptedForPermission = false
-    private var isRunning = false
+    init(shortcut: RecordingShortcut = .defaultShortcut) {
+        self.shortcut = shortcut
+    }
 
     func start() -> Bool {
         guard checkAccessibilityPermission() else {
@@ -33,8 +44,24 @@ class HotkeyManager {
         stopPermissionPolling()
     }
 
+    func updateShortcut(_ shortcut: RecordingShortcut) {
+        invalidateActiveShortcut()
+        self.shortcut = shortcut
+        print("Recording shortcut updated to \(shortcut.displayName)")
+    }
+
+    func setSuspended(_ isSuspended: Bool) {
+        guard self.isSuspended != isSuspended else { return }
+
+        if isSuspended {
+            invalidateActiveShortcut()
+        }
+
+        self.isSuspended = isSuspended
+    }
+
     func hasAccessibilityPermission() -> Bool {
-        return AXIsProcessTrusted()
+        AXIsProcessTrusted()
     }
 
     deinit {
@@ -43,8 +70,8 @@ class HotkeyManager {
     }
 }
 
-extension HotkeyManager {
-    private func checkAccessibilityPermission() -> Bool {
+private extension HotkeyManager {
+    func checkAccessibilityPermission() -> Bool {
         let trusted = AXIsProcessTrusted()
 
         if !trusted && !hasPromptedForPermission {
@@ -57,31 +84,32 @@ extension HotkeyManager {
         return trusted
     }
 
-    private func setupEventTap() -> Bool {
+    func setupEventTap() -> Bool {
         let eventMask = (1 << CGEventType.flagsChanged.rawValue) |
-                       (1 << CGEventType.keyDown.rawValue) |
-                       (1 << CGEventType.tapDisabledByTimeout.rawValue)
+            (1 << CGEventType.keyDown.rawValue) |
+            (1 << CGEventType.keyUp.rawValue) |
+            (1 << CGEventType.tapDisabledByTimeout.rawValue)
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
             options: .defaultTap,
             eventsOfInterest: CGEventMask(eventMask),
-            callback: { proxy, type, event, refcon in
-                guard let refcon = refcon else { return Unmanaged.passUnretained(event) }
+            callback: { _, type, event, refcon in
+                guard let refcon else { return Unmanaged.passUnretained(event) }
 
-                let manager = Unmanaged<HotkeyManager>.fromOpaque(refcon).takeUnretainedValue()
+                let manager = Unmanaged<HotkeyManager>
+                    .fromOpaque(refcon)
+                    .takeUnretainedValue()
 
                 if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-                    print("⚠️ Event tap was disabled by system (type: \(type.rawValue)), re-enabling...")
-                    if let tap = manager.eventTap {
-                        CGEvent.tapEnable(tap: tap, enable: true)
-                        print("✓ Event tap re-enabled successfully")
-                    }
+                    manager.handleDisabledEventTap()
                     return Unmanaged.passUnretained(event)
                 }
 
-                manager.handleEvent(type: type, event: event)
+                if manager.handleEvent(type: type, event: event) {
+                    return nil
+                }
 
                 return Unmanaged.passUnretained(event)
             },
@@ -97,101 +125,217 @@ extension HotkeyManager {
         CGEvent.tapEnable(tap: tap, enable: true)
 
         isRunning = true
-        print("✅ Hotkey manager started successfully (Right Command key)")
-        print("📝 Listening for flagsChanged events...")
+        print("✅ Hotkey manager started successfully (\(shortcut.displayName))")
         return true
     }
 
-    private func handleEvent(type: CGEventType, event: CGEvent) {
-        if type == .flagsChanged {
-            handleFlagsChanged(event: event)
-        } else if type == .keyDown {
-            handleKeyDown(event: event)
+    func handleDisabledEventTap() {
+        print("⚠️ Event tap was disabled by macOS; re-enabling")
+        invalidateActiveShortcut()
+
+        if let eventTap {
+            CGEvent.tapEnable(tap: eventTap, enable: true)
         }
     }
 
-    private func handleFlagsChanged(event: CGEvent) {
-        let keycode = event.getIntegerValueField(.keyboardEventKeycode)
-        let flags = event.flags
+    func handleEvent(type: CGEventType, event: CGEvent) -> Bool {
+        guard !isSuspended else { return false }
 
-        print("DEBUG: FlagsChanged event detected")
-        print("  Keycode: \(keycode) (target: \(targetKeyCode))")
-        print("  Flags raw: \(flags.rawValue)")
-        print("  Command: \(flags.contains(.maskCommand))")
-        print("  Option: \(flags.contains(.maskAlternate))")
-        print("  Control: \(flags.contains(.maskControl))")
-        print("  Shift: \(flags.contains(.maskShift))")
-
-        guard keycode == targetKeyCode else { return }
-
-        let commandPressed = flags.contains(.maskCommand)
-        print("✓ Right Command key detected - pressed: \(commandPressed)")
-
-        if commandPressed && !isTargetKeyPressed {
-            isTargetKeyPressed = true
-            print("▶ Right Command DOWN - starting recording")
-            DispatchQueue.main.async { [weak self] in
-                self?.onKeyDown?()
-            }
-        } else if !commandPressed && isTargetKeyPressed {
-            isTargetKeyPressed = false
-            print("■ Right Command UP - stopping recording")
-            DispatchQueue.main.async { [weak self] in
-                self?.onKeyUp?()
-            }
+        switch type {
+        case .flagsChanged:
+            return handleFlagsChanged(event)
+        case .keyDown:
+            return handleKeyDown(event)
+        case .keyUp:
+            return handleKeyUp(event)
+        default:
+            return false
         }
     }
 
-    private func handleKeyDown(event: CGEvent) {
-        let keycode = event.getIntegerValueField(.keyboardEventKeycode)
+    func handleFlagsChanged(_ event: CGEvent) -> Bool {
+        if shortcut.kind == .modifierOnly {
+            handleModifierShortcut(event)
+        } else {
+            stopCombinationWhenModifiersAreReleased(event.flags)
+        }
 
-        guard keycode == escapeKeyCode && isTargetKeyPressed else { return }
+        return false
+    }
 
-        print("⎋ Escape key pressed while recording - cancelling")
+    func handleModifierShortcut(_ event: CGEvent) {
+        let keyCode = CGKeyCode(
+            event.getIntegerValueField(.keyboardEventKeycode)
+        )
+        guard keyCode == shortcut.keyCode else { return }
+
+        let isPressed = RecordingShortcut.isModifierPressed(
+            keyCode: keyCode,
+            eventFlags: event.flags
+        )
+
+        switch (activationState, isPressed) {
+        case (.idle, true):
+            beginRecording()
+        case (.recording, false):
+            finishRecording()
+        case (.cancelled, false):
+            activationState = .idle
+        default:
+            break
+        }
+    }
+
+    func stopCombinationWhenModifiersAreReleased(_ flags: CGEventFlags) {
+        guard activationState == .recording,
+              !shortcut.matches(modifiers: flags) else {
+            return
+        }
+
+        finishRecording()
+    }
+
+    func handleKeyDown(_ event: CGEvent) -> Bool {
+        let keyCode = CGKeyCode(
+            event.getIntegerValueField(.keyboardEventKeycode)
+        )
+
+        if keyCode == RecordingShortcut.escapeKeyCode && activationState == .recording {
+            cancelRecording()
+            shouldSuppressEscapeKeyUp = true
+            return true
+        }
+
+        guard shortcut.kind != .modifierOnly, keyCode == shortcut.keyCode else {
+            return false
+        }
+
+        if suppressedPrimaryKeyCode == keyCode {
+            return true
+        }
+
+        let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+        guard !isRepeat,
+              activationState == .idle,
+              shortcut.matches(modifiers: event.flags) else {
+            return false
+        }
+
+        suppressedPrimaryKeyCode = keyCode
+        beginRecording()
+        return true
+    }
+
+    func handleKeyUp(_ event: CGEvent) -> Bool {
+        let keyCode = CGKeyCode(
+            event.getIntegerValueField(.keyboardEventKeycode)
+        )
+
+        if keyCode == RecordingShortcut.escapeKeyCode && shouldSuppressEscapeKeyUp {
+            shouldSuppressEscapeKeyUp = false
+            return true
+        }
+
+        guard keyCode == suppressedPrimaryKeyCode else { return false }
+
+        suppressedPrimaryKeyCode = nil
+
+        switch activationState {
+        case .recording:
+            finishRecording()
+        case .cancelled:
+            activationState = .idle
+        case .idle:
+            break
+        }
+
+        return true
+    }
+
+    func beginRecording() {
+        activationState = .recording
+        print("▶ \(shortcut.displayName) DOWN - starting recording")
+
+        DispatchQueue.main.async { [weak self] in
+            self?.onKeyDown?()
+        }
+    }
+
+    func finishRecording() {
+        activationState = .idle
+        print("■ \(shortcut.displayName) UP - stopping recording")
+
+        DispatchQueue.main.async { [weak self] in
+            self?.onKeyUp?()
+        }
+    }
+
+    func cancelRecording() {
+        activationState = .cancelled
+        print("⎋ Escape pressed while recording - cancelling")
+
         DispatchQueue.main.async { [weak self] in
             self?.onCancelRequested?()
         }
     }
 
-    private func cleanup() {
-        if let tap = eventTap {
-            CGEvent.tapEnable(tap: tap, enable: false)
-            eventTap = nil
+    func cancelActiveRecordingIfNeeded() {
+        guard activationState == .recording else { return }
+        cancelRecording()
+    }
+
+    func invalidateActiveShortcut() {
+        cancelActiveRecordingIfNeeded()
+        resetActivationState()
+    }
+
+    func resetActivationState() {
+        activationState = .idle
+        suppressedPrimaryKeyCode = nil
+        shouldSuppressEscapeKeyUp = false
+    }
+
+    func cleanup() {
+        if let eventTap {
+            CGEvent.tapEnable(tap: eventTap, enable: false)
+            self.eventTap = nil
         }
 
-        if let source = runLoopSource {
-            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
-            runLoopSource = nil
+        if let runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+            self.runLoopSource = nil
         }
 
+        resetActivationState()
         isRunning = false
         print("Hotkey manager stopped")
     }
 
-    private func startPermissionPolling() {
+    func startPermissionPolling() {
         stopPermissionPolling()
 
         print("🔄 Polling for Accessibility permission (every 2 seconds)...")
-        permissionCheckTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        permissionCheckTimer = Timer.scheduledTimer(
+            withTimeInterval: 2.0,
+            repeats: true
+        ) { [weak self] _ in
             self?.checkAndStartIfPermissionGranted()
         }
     }
 
-    private func stopPermissionPolling() {
+    func stopPermissionPolling() {
         permissionCheckTimer?.invalidate()
         permissionCheckTimer = nil
     }
 
-    @objc private func checkAndStartIfPermissionGranted() {
-        guard !isRunning else { return }
+    @objc func checkAndStartIfPermissionGranted() {
+        guard !isRunning, AXIsProcessTrusted() else { return }
 
-        if AXIsProcessTrusted() {
-            print("✅ Accessibility permission granted! Starting hotkey manager...")
-            stopPermissionPolling()
+        print("✅ Accessibility permission granted! Starting hotkey manager...")
+        stopPermissionPolling()
 
-            if setupEventTap() {
-                onPermissionGranted?()
-            }
+        if setupEventTap() {
+            onPermissionGranted?()
         }
     }
 }
