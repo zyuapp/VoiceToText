@@ -59,7 +59,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "JustSpeak")
+            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Just Speak")
             button.image?.isTemplate = true
         }
     }
@@ -468,7 +468,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = NSImage(systemSymbolName: "mic.fill.badge.plus", accessibilityDescription: "Recording")
             button.image?.isTemplate = true
         } else {
-            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "JustSpeak")
+            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Just Speak")
             button.image?.isTemplate = true
         }
     }
