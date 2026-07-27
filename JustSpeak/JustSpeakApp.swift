@@ -26,10 +26,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotkeyManager = HotkeyManager()
     private let transcriptionService = TranscriptionService.shared
     private let clipboardManager = ClipboardManager.shared
+    private let transcriptHistory = TranscriptHistoryStore()
     private let recordingOverlay = RecordingOverlayController()
     private var recordingStartTime: Date?
     private var downloadProgressMenuItem: NSMenuItem?
     private var accessibilityMenuItem: NSMenuItem?
+    private let transcriptHistoryMenu = NSMenu()
     private static let selectedDeviceKey = "selectedAudioInputDevice"
     private static let didMigratePreferencesKey = "didMigrateLegacyPreferences"
     private static let legacyBundleIdentifier = "com.zyu.VoiceToText"
@@ -87,6 +89,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         accessibilityMenuItem = createAccessibilityMenuItem()
         menu.addItem(accessibilityMenuItem!)
 
+        let transcriptHistoryItem = NSMenuItem(
+            title: "Recent Transcripts",
+            action: nil,
+            keyEquivalent: ""
+        )
+        transcriptHistoryItem.submenu = transcriptHistoryMenu
+        menu.addItem(transcriptHistoryItem)
+        refreshTranscriptHistoryMenu()
+
         let audioInputItem = NSMenuItem(title: "Audio Input", action: nil, keyEquivalent: "")
         audioInputItem.submenu = createAudioInputSubmenu()
         menu.addItem(audioInputItem)
@@ -95,6 +106,67 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
 
         statusItem?.menu = menu
+    }
+
+    private func refreshTranscriptHistoryMenu() {
+        transcriptHistoryMenu.removeAllItems()
+
+        guard !transcriptHistory.entries.isEmpty else {
+            let emptyItem = NSMenuItem(
+                title: "No Recent Transcripts",
+                action: nil,
+                keyEquivalent: ""
+            )
+            emptyItem.isEnabled = false
+            transcriptHistoryMenu.addItem(emptyItem)
+            return
+        }
+
+        for entry in transcriptHistory.entries {
+            let item = NSMenuItem(
+                title: transcriptMenuTitle(for: entry.text),
+                action: #selector(pasteTranscript(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = entry.text
+            item.toolTip = entry.text
+            transcriptHistoryMenu.addItem(item)
+        }
+
+        transcriptHistoryMenu.addItem(NSMenuItem.separator())
+
+        let clearItem = NSMenuItem(
+            title: "Clear History",
+            action: #selector(clearTranscriptHistory),
+            keyEquivalent: ""
+        )
+        clearItem.target = self
+        transcriptHistoryMenu.addItem(clearItem)
+    }
+
+    private func transcriptMenuTitle(for text: String) -> String {
+        let singleLineText = text
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let maximumLength = 60
+
+        guard singleLineText.count > maximumLength else {
+            return singleLineText
+        }
+
+        return "\(singleLineText.prefix(maximumLength))…"
+    }
+
+    @objc private func pasteTranscript(_ sender: NSMenuItem) {
+        guard let text = sender.representedObject as? String else { return }
+        clipboardManager.copyAndPaste(text)
+    }
+
+    @objc private func clearTranscriptHistory() {
+        transcriptHistory.clear()
+        refreshTranscriptHistoryMenu()
     }
 
     private func createAudioInputSubmenu() -> NSMenu {
@@ -459,6 +531,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         print("Transcription: \(trimmed)")
+        transcriptHistory.add(trimmed)
+        refreshTranscriptHistoryMenu()
         clipboardManager.copyAndPaste(trimmed)
     }
 
