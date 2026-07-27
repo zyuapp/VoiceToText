@@ -32,17 +32,20 @@ final class RecordingOverlayController {
     private lazy var panel = createPanel()
     private var levelTimer: Timer?
     private var previewStartTime = Date()
+    private var presentationGeneration = 0
 
     func show(
         targetApplication: NSRunningApplication?,
         levelProvider: @escaping () -> Double
     ) {
+        presentationGeneration += 1
         preparePresentation(targetApplication: targetApplication)
         startLevelUpdates(levelProvider: levelProvider)
         animateIn()
     }
 
     func showPreview(targetApplication: NSRunningApplication?) {
+        presentationGeneration += 1
         previewStartTime = Date()
         preparePresentation(targetApplication: targetApplication)
         startLevelUpdates { [weak self] in
@@ -52,6 +55,8 @@ final class RecordingOverlayController {
     }
 
     func hide() {
+        presentationGeneration += 1
+        let generation = presentationGeneration
         stopLevelUpdates()
 
         withAnimation(.smooth(duration: 0.2)) {
@@ -59,7 +64,7 @@ final class RecordingOverlayController {
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { [weak self] in
-            guard let self else { return }
+            guard let self, self.presentationGeneration == generation else { return }
 
             withAnimation(.easeOut(duration: 0.16)) {
                 self.model.isPresented = false
@@ -67,7 +72,8 @@ final class RecordingOverlayController {
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) { [weak self] in
-            self?.panel.orderOut(nil)
+            guard let self, self.presentationGeneration == generation else { return }
+            self.panel.orderOut(nil)
         }
     }
 }
@@ -107,15 +113,16 @@ private extension RecordingOverlayController {
     }
 
     func animateIn() {
+        let generation = presentationGeneration
         DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
+            guard let self, self.presentationGeneration == generation else { return }
 
             withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
                 self.model.isPresented = true
             }
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                guard let self else { return }
+                guard let self, self.presentationGeneration == generation else { return }
 
                 withAnimation(.spring(response: 0.42, dampingFraction: 0.82)) {
                     self.model.isExpanded = true
