@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>JustSpeak needs access to your microphone to record your voice for transcription.</string>
+	<string>Just Speak needs access to your microphone to record your voice for transcription.</string>
 </dict>
 </plist>
