@@ -38,6 +38,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let transcriptHistory = TranscriptHistoryStore()
     private let recordingOverlay = RecordingOverlayController()
     private let recordingCuePlayer = RecordingCuePlayer()
+    private lazy var shortcutSettingsWindowController = ShortcutSettingsWindowController(
+        store: shortcutStore,
+        captureController: shortcutCaptureController
+    )
     private var isRecordingHotkeyHeld = false
     private var recordingStartTime: Date?
     private var downloadProgressMenuItem: NSMenuItem?
@@ -224,12 +228,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openShortcutSettings() {
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        NSApplication.shared.sendAction(
-            Selector(("showSettingsWindow:")),
-            to: nil,
-            from: self
-        )
+        shortcutSettingsWindowController.present()
     }
 
     private func createAudioInputSubmenu() -> NSMenu {
