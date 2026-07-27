@@ -121,6 +121,7 @@ Models/
 
 # Temporary audio files
 *.wav
+!JustSpeak/DoubleSpark.wav
 *.m4a
 Recordings/
 

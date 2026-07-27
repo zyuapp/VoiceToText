@@ -158,10 +158,10 @@ private extension RecordingOverlayController {
                 guard let self else { return }
 
                 let nextLevel = min(max(levelProvider(), 0), 1)
-                let smoothing = nextLevel > self.model.audioLevel ? 0.11 : 0.055
+                let smoothing = nextLevel > self.model.audioLevel ? 0.24 : 0.045
                 self.model.audioLevel += (nextLevel - self.model.audioLevel) * smoothing
 
-                if nextLevel == 0, self.model.audioLevel < 0.008 {
+                if nextLevel == 0, self.model.audioLevel < 0.004 {
                     self.model.audioLevel = 0
                 }
             }
@@ -331,13 +331,8 @@ private struct FlowingWaveform: View {
     private func waveformPath(size: CGSize, time: TimeInterval) -> Path {
         var path = Path()
         let centerY = size.height / 2
-        let visibleLevel = max((level - 0.04) / 0.96, 0)
-
-        guard visibleLevel > 0 else {
-            path.move(to: CGPoint(x: 0, y: centerY))
-            path.addLine(to: CGPoint(x: size.width, y: centerY))
-            return path
-        }
+        let normalizedLevel = max((level - 0.015) / 0.985, 0)
+        let visibleLevel = max(normalizedLevel, 0.018)
 
         let pointCount = max(Int(size.width / 2), 2)
         let energy = CGFloat(pow(visibleLevel, 0.58))
