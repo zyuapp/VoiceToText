@@ -3,10 +3,10 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RUNTIME_VERSION="1.13.3"
+RUNTIME_VERSION="1.13.4"
 ARCHIVE_NAME="sherpa-onnx-v${RUNTIME_VERSION}-osx-arm64-static-lib.tar.bz2"
 ARCHIVE_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v${RUNTIME_VERSION}/${ARCHIVE_NAME}"
-ARCHIVE_SHA256="8a524849ea13db3abe667f5f785280b2396dee17856c912e22cb24d0344b9a5a"
+ARCHIVE_SHA256="57801db2bbb786a5d343f515a38ff210b401842338bdc804fa075312d1cd2404"
 RUNTIME_DIR="${PROJECT_ROOT}/sherpa-onnx"
 VERSION_MARKER="${RUNTIME_DIR}/.just-speak-runtime"
 LIBRARY_FILELIST="${PROJECT_ROOT}/ParakeetLibraries.filelist"

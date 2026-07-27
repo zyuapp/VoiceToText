@@ -13,7 +13,7 @@ does not endorse JustSpeak.
 
 ## Native runtime
 
-JustSpeak statically links the sherpa-onnx 1.13.3 macOS arm64 runtime and its
+JustSpeak statically links the sherpa-onnx 1.13.4 macOS arm64 runtime and its
 runtime dependencies:
 
 - sherpa-onnx, Kaldi decoder, kaldi-native-fbank, kaldifst, OpenFST, and
@@ -23,7 +23,7 @@ runtime dependencies:
 
 Source and license materials:
 
-- https://github.com/k2-fsa/sherpa-onnx/tree/v1.13.3
+- https://github.com/k2-fsa/sherpa-onnx/tree/v1.13.4
 - https://github.com/microsoft/onnxruntime
 
 The full license and third-party notice texts shipped with the app are in this
