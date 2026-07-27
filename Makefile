@@ -5,7 +5,8 @@ SCHEME := JustSpeak
 CONFIGURATION ?= Debug
 DERIVED_DATA := build
 APP_PATH := $(DERIVED_DATA)/Build/Products/$(CONFIGURATION)/JustSpeak.app
-INSTALL_PATH := /Applications/JustSpeak.app
+INSTALL_PATH := /Applications/Just Speak.app
+LEGACY_INSTALL_PATH := /Applications/JustSpeak.app
 XCODE_DERIVED_DATA := $(HOME)/Library/Developer/Xcode/DerivedData
 
 .PHONY: parakeet build release run open install clean-debug-apps clean rebuild
@@ -31,6 +32,7 @@ open:
 
 install: parakeet release
 	pkill -x JustSpeak 2>/dev/null || true
+	rm -rf "$(LEGACY_INSTALL_PATH)"
 	rm -rf "$(INSTALL_PATH)"
 	ditto "$(DERIVED_DATA)/Build/Products/Release/JustSpeak.app" "$(INSTALL_PATH)"
 	$(MAKE) clean-debug-apps
