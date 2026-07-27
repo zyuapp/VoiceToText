@@ -26,6 +26,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotkeyManager = HotkeyManager()
     private let transcriptionService = TranscriptionService.shared
     private let clipboardManager = ClipboardManager.shared
+    private let recordingOverlay = RecordingOverlayController()
     private var recordingStartTime: Date?
     private var downloadProgressMenuItem: NSMenuItem?
     private var accessibilityMenuItem: NSMenuItem?
@@ -41,6 +42,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupHotkeyManager()
         setupTranscriptionService()
         restoreSelectedDevice()
+        previewRecordingOverlayIfRequested()
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -333,22 +335,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handleHotkeyDown() {
+        let targetApplication = NSWorkspace.shared.frontmostApplication
         recordingStartTime = Date()
         updateStatusIcon(recording: true)
 
         guard audioRecorder.startRecording() else {
             showNotification(title: "Recording Failed", body: "Could not start recording")
             updateStatusIcon(error: true)
+            recordingOverlay.hide()
             recordingStartTime = nil
             return
         }
 
+        recordingOverlay.show(targetApplication: targetApplication) { [weak self] in
+            self?.audioRecorder.currentLevel ?? 0
+        }
         print("Recording started via hotkey")
     }
 
     private func handleHotkeyUp() {
         let startTime = recordingStartTime
         recordingStartTime = nil
+        recordingOverlay.hide()
         updateStatusIcon(recording: false)
 
         guard let recordingURL = audioRecorder.stopRecording() else {
@@ -382,9 +390,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleCancellation() {
         recordingStartTime = nil
+        recordingOverlay.hide()
         updateStatusIcon()
         audioRecorder.cancelRecording()
         print("Recording cancelled by user")
+    }
+
+    private func previewRecordingOverlayIfRequested() {
+        guard CommandLine.arguments.contains("--preview-recording-overlay") else { return }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            self?.recordingOverlay.showPreview(
+                targetApplication: NSWorkspace.shared.frontmostApplication
+            )
+        }
     }
 
     private func processRecording(url: URL) {

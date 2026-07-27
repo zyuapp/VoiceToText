@@ -12,6 +12,23 @@ class AudioRecorder: NSObject {
         audioRecorder?.isRecording ?? false
     }
 
+    var currentLevel: Double {
+        guard let audioRecorder, audioRecorder.isRecording else { return 0 }
+
+        audioRecorder.updateMeters()
+        let decibels = audioRecorder.averagePower(forChannel: 0)
+        let noiseGate: Float = -40
+        let loudSpeechLevel: Float = -8
+
+        guard decibels > noiseGate else { return 0 }
+
+        let normalizedLevel = Double(
+            (decibels - noiseGate) / (loudSpeechLevel - noiseGate)
+        )
+        let boostedLevel = pow(min(max(normalizedLevel, 0), 1), 0.48)
+        return boostedLevel
+    }
+
     static func getAvailableInputDevices() -> [(id: AudioDeviceID, name: String)] {
         var devices: [(id: AudioDeviceID, name: String)] = []
 
@@ -182,6 +199,7 @@ extension AudioRecorder {
         do {
             audioRecorder = try AVAudioRecorder(url: url, settings: settings)
             audioRecorder?.delegate = self
+            audioRecorder?.isMeteringEnabled = true
             audioRecorder?.record()
             print("Recording started: \(url.path)")
             return true
