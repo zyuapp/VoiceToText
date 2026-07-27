@@ -28,6 +28,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let clipboardManager = ClipboardManager.shared
     private let transcriptHistory = TranscriptHistoryStore()
     private let recordingOverlay = RecordingOverlayController()
+    private let recordingCuePlayer = RecordingCuePlayer()
+    private var isRecordingHotkeyHeld = false
     private var recordingStartTime: Date?
     private var downloadProgressMenuItem: NSMenuItem?
     private var accessibilityMenuItem: NSMenuItem?
@@ -408,8 +410,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleHotkeyDown() {
         let targetApplication = NSWorkspace.shared.frontmostApplication
-        recordingStartTime = Date()
+        isRecordingHotkeyHeld = true
         updateStatusIcon(recording: true)
+
+        recordingCuePlayer.playStartCue { [weak self] in
+            guard let self, self.isRecordingHotkeyHeld else { return }
+            self.startRecording(targetApplication: targetApplication)
+        }
+    }
+
+    private func startRecording(targetApplication: NSRunningApplication?) {
+        recordingStartTime = Date()
 
         guard audioRecorder.startRecording() else {
             showNotification(title: "Recording Failed", body: "Could not start recording")
@@ -426,7 +437,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handleHotkeyUp() {
-        let startTime = recordingStartTime
+        isRecordingHotkeyHeld = false
+        recordingCuePlayer.stop()
+
+        guard let startTime = recordingStartTime else {
+            recordingOverlay.hide()
+            updateStatusIcon(recording: false)
+            return
+        }
+
         recordingStartTime = nil
         recordingOverlay.hide()
         updateStatusIcon(recording: false)
@@ -434,11 +453,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let recordingURL = audioRecorder.stopRecording() else {
             showNotification(title: "Recording Failed", body: "Could not save recording")
             updateStatusIcon(error: true)
-            return
-        }
-
-        guard let startTime = startTime else {
-            print("No recording start time recorded")
             return
         }
 
@@ -461,7 +475,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handleCancellation() {
+        isRecordingHotkeyHeld = false
         recordingStartTime = nil
+        recordingCuePlayer.stop()
         recordingOverlay.hide()
         updateStatusIcon()
         audioRecorder.cancelRecording()
