@@ -31,6 +31,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var downloadProgressMenuItem: NSMenuItem?
     private var accessibilityMenuItem: NSMenuItem?
     private static let selectedDeviceKey = "selectedAudioInputDevice"
+    private static let visualizerStyleKey = "recordingVisualizerStyle"
     private static let didMigratePreferencesKey = "didMigrateLegacyPreferences"
     private static let legacyBundleIdentifier = "com.zyu.VoiceToText"
 
@@ -42,6 +43,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupHotkeyManager()
         setupTranscriptionService()
         restoreSelectedDevice()
+        restoreVisualizerStyle()
         previewRecordingOverlayIfRequested()
     }
 
@@ -90,6 +92,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let audioInputItem = NSMenuItem(title: "Audio Input", action: nil, keyEquivalent: "")
         audioInputItem.submenu = createAudioInputSubmenu()
         menu.addItem(audioInputItem)
+
+        let indicatorItem = NSMenuItem(title: "Recording Indicator", action: nil, keyEquivalent: "")
+        indicatorItem.submenu = createVisualizerStyleSubmenu()
+        menu.addItem(indicatorItem)
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
@@ -160,6 +166,72 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             audioRecorder.setInputDevice(id: deviceID)
             print("Audio input set to: \(sender.title)")
         }
+    }
+
+    private func createVisualizerStyleSubmenu() -> NSMenu {
+        let submenu = NSMenu()
+        let selectedStyle = storedVisualizerStyle()
+
+        for (index, style) in RecordingVisualizerStyle.allCases.enumerated() {
+            let item = NSMenuItem(
+                title: style.title,
+                action: #selector(selectVisualizerStyle(_:)),
+                keyEquivalent: ""
+            )
+            item.tag = index
+            item.target = self
+            item.state = style == selectedStyle ? .on : .off
+            submenu.addItem(item)
+        }
+
+        submenu.addItem(NSMenuItem.separator())
+
+        let previewItem = NSMenuItem(
+            title: "Preview Indicator",
+            action: #selector(previewRecordingOverlay),
+            keyEquivalent: ""
+        )
+        previewItem.target = self
+        submenu.addItem(previewItem)
+
+        return submenu
+    }
+
+    @objc private func selectVisualizerStyle(_ sender: NSMenuItem) {
+        let styles = RecordingVisualizerStyle.allCases
+
+        guard styles.indices.contains(sender.tag) else { return }
+
+        let style = styles[sender.tag]
+
+        for item in sender.menu?.items ?? [] where item.action == #selector(selectVisualizerStyle(_:)) {
+            item.state = item === sender ? .on : .off
+        }
+
+        UserDefaults.standard.set(style.rawValue, forKey: Self.visualizerStyleKey)
+        recordingOverlay.style = style
+        previewRecordingOverlay()
+        print("Recording indicator set to: \(style.title)")
+    }
+
+    @objc private func previewRecordingOverlay() {
+        recordingOverlay.showPreview(
+            targetApplication: NSWorkspace.shared.frontmostApplication,
+            duration: 6
+        )
+    }
+
+    private func storedVisualizerStyle() -> RecordingVisualizerStyle {
+        guard let rawValue = UserDefaults.standard.string(forKey: Self.visualizerStyleKey),
+              let style = RecordingVisualizerStyle(rawValue: rawValue) else {
+            return .default
+        }
+
+        return style
+    }
+
+    private func restoreVisualizerStyle() {
+        recordingOverlay.style = storedVisualizerStyle()
     }
 
     private func restoreSelectedDevice() {
@@ -347,8 +419,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        recordingOverlay.show(targetApplication: targetApplication) { [weak self] in
-            self?.audioRecorder.currentLevel ?? 0
+        recordingOverlay.show(targetApplication: targetApplication) { [weak self] deltaTime in
+            self?.audioRecorder.sampleLevel(deltaTime: deltaTime) ?? 0
         }
         print("Recording started via hotkey")
     }

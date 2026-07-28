@@ -7,26 +7,24 @@ class AudioRecorder: NSObject {
     private var recordingURL: URL?
     private(set) var lastRecordingURL: URL?
     private var selectedDeviceID: AudioDeviceID?
+    private var levelMeter = AudioLevelMeter()
 
     var isRecording: Bool {
         audioRecorder?.isRecording ?? false
     }
 
-    var currentLevel: Double {
+    /// Reads the meters and advances the level filter by `deltaTime` seconds, returning the
+    /// filtered 0...1 level. `deltaTime` must be non-negative and modestly bounded.
+    func sampleLevel(deltaTime: TimeInterval) -> Double {
         guard let audioRecorder, audioRecorder.isRecording else { return 0 }
 
         audioRecorder.updateMeters()
-        let decibels = audioRecorder.averagePower(forChannel: 0)
-        let noiseGate: Float = -40
-        let loudSpeechLevel: Float = -8
 
-        guard decibels > noiseGate else { return 0 }
-
-        let normalizedLevel = Double(
-            (decibels - noiseGate) / (loudSpeechLevel - noiseGate)
+        return levelMeter.update(
+            peakDecibels: audioRecorder.peakPower(forChannel: 0),
+            averageDecibels: audioRecorder.averagePower(forChannel: 0),
+            deltaTime: deltaTime
         )
-        let boostedLevel = pow(min(max(normalizedLevel, 0), 1), 0.48)
-        return boostedLevel
     }
 
     static func getAvailableInputDevices() -> [(id: AudioDeviceID, name: String)] {
@@ -195,6 +193,7 @@ extension AudioRecorder {
         }
 
         let settings = createAudioSettings()
+        levelMeter.reset()
 
         do {
             audioRecorder = try AVAudioRecorder(url: url, settings: settings)
