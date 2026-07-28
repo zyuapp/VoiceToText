@@ -6,9 +6,14 @@ import SwiftUI
 final class RecordingOverlayModel: ObservableObject {
     @Published var isPresented = false
     @Published var isExpanded = false
-    @Published var audioLevel = 0.0
+    @Published var style = RecordingVisualizerStyle.default
     @Published var targetAppIcon: NSImage
     @Published var targetAppName = "Current app"
+
+    /// Level samples live outside `@Published` so 60 Hz metering never invalidates the
+    /// pill's layout; the visualizer reads the track from its own timeline instead.
+    let levelTrack = RecordingLevelTrack()
+    let sparkField = EmberSparkField()
 
     init() {
         targetAppIcon = NSImage(
@@ -31,12 +36,18 @@ final class RecordingOverlayController {
     private let model = RecordingOverlayModel()
     private lazy var panel = createPanel()
     private var levelTimer: Timer?
-    private var previewStartTime = Date()
+    private var lastSampleTime: TimeInterval?
+    private var previewStartTime = Date.timeIntervalSinceReferenceDate
     private var presentationGeneration = 0
+
+    var style: RecordingVisualizerStyle {
+        get { model.style }
+        set { model.style = newValue }
+    }
 
     func show(
         targetApplication: NSRunningApplication?,
-        levelProvider: @escaping () -> Double
+        levelProvider: @escaping (TimeInterval) -> Double
     ) {
         presentationGeneration += 1
         preparePresentation(targetApplication: targetApplication)
@@ -44,14 +55,15 @@ final class RecordingOverlayController {
         animateIn()
     }
 
-    func showPreview(targetApplication: NSRunningApplication?) {
+    func showPreview(targetApplication: NSRunningApplication?, duration: TimeInterval? = nil) {
         presentationGeneration += 1
-        previewStartTime = Date()
+        previewStartTime = Date.timeIntervalSinceReferenceDate
         preparePresentation(targetApplication: targetApplication)
-        startLevelUpdates { [weak self] in
-            self?.simulatedAudioLevel() ?? 0.35
+        startLevelUpdates { [weak self] _ in
+            self?.simulatedAudioLevel() ?? 0
         }
         animateIn()
+        scheduleAutomaticHide(after: duration)
     }
 
     func hide() {
@@ -74,12 +86,17 @@ final class RecordingOverlayController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) { [weak self] in
             guard let self, self.presentationGeneration == generation else { return }
             self.panel.orderOut(nil)
+            self.model.levelTrack.clear()
+            self.model.sparkField.clear()
         }
     }
 }
 
 @MainActor
 private extension RecordingOverlayController {
+    static let sampleInterval = 1.0 / 60.0
+    static let maximumDeltaTime = 0.25
+
     func createPanel() -> NSPanel {
         let panel = RecordingOverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 370, height: 92),
@@ -104,7 +121,8 @@ private extension RecordingOverlayController {
 
     func preparePresentation(targetApplication: NSRunningApplication?) {
         model.updateTargetApplication(targetApplication)
-        model.audioLevel = 0
+        model.levelTrack.clear()
+        model.sparkField.clear()
         model.isPresented = false
         model.isExpanded = false
 
@@ -131,6 +149,16 @@ private extension RecordingOverlayController {
         }
     }
 
+    func scheduleAutomaticHide(after duration: TimeInterval?) {
+        guard let duration else { return }
+
+        let generation = presentationGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
+            guard let self, self.presentationGeneration == generation else { return }
+            self.hide()
+        }
+    }
+
     func positionPanel() {
         let mouseLocation = NSEvent.mouseLocation
         let screen = NSScreen.screens.first {
@@ -149,23 +177,32 @@ private extension RecordingOverlayController {
         panel.setFrameOrigin(origin)
     }
 
-    func startLevelUpdates(levelProvider: @escaping () -> Double) {
+    /// Runs in `.common` mode so menu tracking and window drags cannot stall metering.
+    func startLevelUpdates(levelProvider: @escaping (TimeInterval) -> Double) {
         stopLevelUpdates()
 
-        levelTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) {
-            [weak self] _ in
+        lastSampleTime = nil
+
+        let timer = Timer(timeInterval: Self.sampleInterval, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self else { return }
-
-                let nextLevel = min(max(levelProvider(), 0), 1)
-                let smoothing = nextLevel > self.model.audioLevel ? 0.24 : 0.045
-                self.model.audioLevel += (nextLevel - self.model.audioLevel) * smoothing
-
-                if nextLevel == 0, self.model.audioLevel < 0.004 {
-                    self.model.audioLevel = 0
-                }
+                self?.sampleLevel(using: levelProvider)
             }
         }
+
+        RunLoop.main.add(timer, forMode: .common)
+        levelTimer = timer
+    }
+
+    func sampleLevel(using levelProvider: (TimeInterval) -> Double) {
+        let now = Date.timeIntervalSinceReferenceDate
+        let elapsed = lastSampleTime.map { now - $0 } ?? Self.sampleInterval
+        lastSampleTime = now
+
+        // Wall clock can jump backwards, which would drive the filters with a negative step.
+        let deltaTime = min(max(elapsed, 0), Self.maximumDeltaTime)
+        let level = min(max(levelProvider(deltaTime), 0), 1)
+        model.levelTrack.append(level: level, at: now)
+        model.sparkField.advance(level: level, deltaTime: deltaTime)
     }
 
     func stopLevelUpdates() {
@@ -173,16 +210,18 @@ private extension RecordingOverlayController {
         levelTimer = nil
     }
 
+    /// Phrases of stressed syllables separated by pauses, so previews exercise the same
+    /// dynamics real speech does.
     func simulatedAudioLevel() -> Double {
-        let elapsed = Date().timeIntervalSince(previewStartTime)
-        let cyclePosition = elapsed.truncatingRemainder(dividingBy: 5)
+        let elapsed = Date.timeIntervalSinceReferenceDate - previewStartTime
+        let phrasePosition = elapsed.truncatingRemainder(dividingBy: 4.2)
 
-        guard cyclePosition > 1.5 else { return 0 }
+        guard phrasePosition > 0.35, phrasePosition < 3.4 else { return 0 }
 
-        let slowPulse = (sin(elapsed * 2.1) + 1) * 0.16
-        let voicePulse = abs(sin(elapsed * 6.7)) * 0.34
-        let detail = abs(sin(elapsed * 13.1)) * 0.13
-        return min(0.22 + slowPulse + voicePulse + detail, 0.9)
+        let syllable = pow(abs(sin(elapsed * 7.4)), 1.6)
+        let stress = 0.55 + 0.45 * abs(sin(elapsed * 1.9))
+        let grain = 0.85 + 0.15 * sin(elapsed * 23)
+        return min(syllable * stress * grain * 1.3, 1)
     }
 }
 
@@ -226,7 +265,7 @@ private struct LiquidGlassRecordingOverlay: View {
     var body: some View {
         if model.isExpanded {
             RecordingPill(model: model)
-                .frame(width: 300, height: 54)
+                .frame(width: model.style.pillWidth, height: 54)
                 .glassEffect(.regular, in: Capsule())
                 .glassEffectTransition(.materialize)
                 .transition(
@@ -243,7 +282,7 @@ private struct LegacyRecordingOverlay: View {
     var body: some View {
         if model.isExpanded {
             RecordingPill(model: model)
-                .frame(width: 300, height: 54)
+                .frame(width: model.style.pillWidth, height: 54)
                 .background(.ultraThinMaterial, in: Capsule())
                 .overlay {
                     Capsule().stroke(.white.opacity(0.28), lineWidth: 0.75)
@@ -272,89 +311,41 @@ private struct RecordingPill: View {
         HStack(spacing: 11) {
             TargetAppIcon(model: model)
 
-            FlowingWaveform(level: model.audioLevel)
-                .frame(width: 126, height: 28)
+            RecordingVisualizer(
+                style: model.style,
+                track: model.levelTrack,
+                sparkField: model.sparkField
+            )
 
             Divider()
                 .frame(height: 24)
                 .overlay(.primary.opacity(0.2))
 
-            HStack(spacing: 5) {
-                Text("ESC")
-                    .font(.system(size: 10.5, weight: .semibold, design: .default))
-                    .offset(x: 1, y: -0.75)
-                    .frame(width: 34, height: 22, alignment: .center)
-                    .foregroundStyle(.primary)
-                    .background(.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(.primary.opacity(0.18), lineWidth: 0.75)
-                    }
-
-                Text("to cancel")
-                    .font(.system(size: 11, weight: .medium, design: .default))
-                    .foregroundStyle(.secondary)
-            }
-            .fixedSize()
+            CancelHint()
         }
         .padding(.leading, 10)
         .padding(.trailing, 13)
     }
 }
 
-private struct FlowingWaveform: View {
-    let level: Double
-
+private struct CancelHint: View {
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-            Canvas { context, size in
-                let path = waveformPath(
-                    size: size,
-                    time: timeline.date.timeIntervalSinceReferenceDate
-                )
+        HStack(spacing: 5) {
+            Text("ESC")
+                .font(.system(size: 10.5, weight: .semibold))
+                .offset(x: 1, y: -0.75)
+                .frame(width: 34, height: 22)
+                .foregroundStyle(.primary)
+                .background(.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(.primary.opacity(0.18), lineWidth: 0.75)
+                }
 
-                context.stroke(
-                    path,
-                    with: .color(.primary.opacity(0.94)),
-                    style: StrokeStyle(
-                        lineWidth: 2,
-                        lineCap: .round,
-                        lineJoin: .round
-                    )
-                )
-            }
+            Text("to cancel")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
         }
-        .drawingGroup()
-        .accessibilityHidden(true)
-    }
-
-    private func waveformPath(size: CGSize, time: TimeInterval) -> Path {
-        var path = Path()
-        let centerY = size.height / 2
-        let normalizedLevel = max((level - 0.015) / 0.985, 0)
-        let visibleLevel = max(normalizedLevel, 0.018)
-
-        let pointCount = max(Int(size.width / 2), 2)
-        let energy = CGFloat(pow(visibleLevel, 0.58))
-        let amplitude = energy * size.height * 0.48
-        let motion = time * 7.6
-
-        for index in 0...pointCount {
-            let progress = CGFloat(index) / CGFloat(pointCount)
-            let x = progress * size.width
-            let envelope = sin(progress * .pi)
-            let primary = sin(progress * 32 + motion)
-            let detail = sin(progress * 67 - motion * 0.72) * (0.2 + energy * 0.12)
-            let y = centerY + (primary + detail) * amplitude * envelope
-            let point = CGPoint(x: x, y: y)
-
-            if index == 0 {
-                path.move(to: point)
-            } else {
-                path.addLine(to: point)
-            }
-        }
-
-        return path
+        .fixedSize()
     }
 }
