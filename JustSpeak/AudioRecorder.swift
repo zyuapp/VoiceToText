@@ -7,7 +7,8 @@ class AudioRecorder: NSObject {
     private var recordingURL: URL?
     private(set) var lastRecordingURL: URL?
     private var selectedDeviceID: AudioDeviceID?
-    private var levelMeter = AudioLevelMeter()
+    private var audioLevelMapper = AdaptiveAudioLevelMapper()
+    private var levelFollower = AudioLevelFollower()
 
     var isRecording: Bool {
         audioRecorder?.isRecording ?? false
@@ -20,11 +21,13 @@ class AudioRecorder: NSObject {
 
         audioRecorder.updateMeters()
 
-        return levelMeter.update(
-            peakDecibels: audioRecorder.peakPower(forChannel: 0),
+        let mapped = audioLevelMapper.update(
             averageDecibels: audioRecorder.averagePower(forChannel: 0),
-            deltaTime: deltaTime
+            peakDecibels: audioRecorder.peakPower(forChannel: 0),
+            uptime: ProcessInfo.processInfo.systemUptime
         )
+
+        return levelFollower.follow(mapped, deltaTime: deltaTime)
     }
 
     static func getAvailableInputDevices() -> [(id: AudioDeviceID, name: String)] {
@@ -193,12 +196,13 @@ extension AudioRecorder {
         }
 
         let settings = createAudioSettings()
-        levelMeter.reset()
+        levelFollower.reset()
 
         do {
             audioRecorder = try AVAudioRecorder(url: url, settings: settings)
             audioRecorder?.delegate = self
             audioRecorder?.isMeteringEnabled = true
+            audioLevelMapper.beginSession()
             audioRecorder?.record()
             print("Recording started: \(url.path)")
             return true
@@ -258,5 +262,114 @@ extension AudioRecorder: AVAudioRecorderDelegate {
         if let error = error {
             print("Recording encode error: \(error)")
         }
+    }
+}
+
+private struct AdaptiveAudioLevelMapper {
+    private enum Constants {
+        static let initialNoiseFloor: Float = -50
+        static let minimumNoiseFloor: Float = -70
+        static let maximumNoiseFloor: Float = -25
+        static let gateOpenSNR: Float = 6
+        static let gateCloseSNR: Float = 3
+        static let fullScaleSNR: Float = 25
+        static let steadyLevelDeviation: Float = 2
+        static let maximumSteadyNoiseSNR: Float = 14
+        static let normalRiseRate: Float = 1.5
+        static let steadyRiseRate: Float = 6
+        static let hangoverDuration = 0.4
+        static let recentLevelCapacity = 15
+    }
+
+    private var noiseFloor = Constants.initialNoiseFloor
+    private var gateIsOpen = false
+    private var hangoverRemaining = 0.0
+    private var recentLevels: [Float] = []
+    private var lastUpdateTime: TimeInterval?
+
+    mutating func beginSession() {
+        self = Self()
+    }
+
+    mutating func update(
+        averageDecibels: Float,
+        peakDecibels: Float,
+        uptime: TimeInterval
+    ) -> Double {
+        let interval = updateInterval(at: uptime)
+        let level = max(averageDecibels, peakDecibels - 8)
+
+        guard level.isFinite, level > -100 else { return 0 }
+
+        recordRecentLevel(level)
+        adaptNoiseFloor(toward: level, interval: interval)
+
+        let signalToNoise = level - noiseFloor
+        updateGate(signalToNoise: signalToNoise, interval: interval)
+        return visualLevel(signalToNoise: signalToNoise)
+    }
+
+    private mutating func updateInterval(at uptime: TimeInterval) -> TimeInterval {
+        defer { lastUpdateTime = uptime }
+        guard let lastUpdateTime else { return 1.0 / 30.0 }
+        return min(max(uptime - lastUpdateTime, 1.0 / 120.0), 0.1)
+    }
+
+    private mutating func recordRecentLevel(_ level: Float) {
+        recentLevels.append(level)
+        if recentLevels.count > Constants.recentLevelCapacity {
+            recentLevels.removeFirst()
+        }
+    }
+
+    private mutating func adaptNoiseFloor(toward level: Float, interval: TimeInterval) {
+        if level < noiseFloor {
+            let alpha = Float(1 - exp(-interval / 0.25))
+            noiseFloor += (level - noiseFloor) * alpha
+        } else if shouldRaiseNoiseFloor(toward: level) {
+            let rate = recentLevelsAreSteady ? Constants.steadyRiseRate : Constants.normalRiseRate
+            noiseFloor += min(level - noiseFloor, rate * Float(interval))
+        }
+
+        noiseFloor = min(
+            max(noiseFloor, Constants.minimumNoiseFloor),
+            Constants.maximumNoiseFloor
+        )
+    }
+
+    private func shouldRaiseNoiseFloor(toward level: Float) -> Bool {
+        guard gateIsOpen else { return true }
+        return recentLevelsAreSteady
+            && level - noiseFloor <= Constants.maximumSteadyNoiseSNR
+    }
+
+    private var recentLevelsAreSteady: Bool {
+        guard recentLevels.count == Constants.recentLevelCapacity else { return false }
+
+        let mean = recentLevels.reduce(0, +) / Float(recentLevels.count)
+        let variance = recentLevels.reduce(0) { total, level in
+            let difference = level - mean
+            return total + difference * difference
+        } / Float(recentLevels.count)
+        return sqrt(variance) < Constants.steadyLevelDeviation
+    }
+
+    private mutating func updateGate(signalToNoise: Float, interval: TimeInterval) {
+        if signalToNoise >= Constants.gateOpenSNR {
+            gateIsOpen = true
+            hangoverRemaining = Constants.hangoverDuration
+        } else if gateIsOpen, signalToNoise < Constants.gateCloseSNR {
+            hangoverRemaining -= interval
+            if hangoverRemaining <= 0 {
+                gateIsOpen = false
+            }
+        }
+    }
+
+    private func visualLevel(signalToNoise: Float) -> Double {
+        let usableSignal = max(signalToNoise - Constants.gateCloseSNR, 0)
+        let usableRange = Constants.fullScaleSNR - Constants.gateCloseSNR
+        let normalizedLevel = min(usableSignal / usableRange, 1)
+        return Double(pow(normalizedLevel, 0.7))
     }
 }

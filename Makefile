@@ -5,6 +5,7 @@ SCHEME := JustSpeak
 CONFIGURATION ?= Debug
 DERIVED_DATA := build
 APP_PATH := $(DERIVED_DATA)/Build/Products/$(CONFIGURATION)/JustSpeak.app
+RECORDING_CUE_PATH := $(APP_PATH)/Contents/Resources/DoubleSpark.wav
 INSTALL_PATH := /Applications/Just Speak.app
 LEGACY_INSTALL_PATH := /Applications/JustSpeak.app
 XCODE_DERIVED_DATA := $(HOME)/Library/Developer/Xcode/DerivedData
@@ -18,6 +19,7 @@ build:
 	mkdir -p "$(DERIVED_DATA)"
 	touch "$(DERIVED_DATA)/.metadata_never_index"
 	xcodebuild -quiet -project "$(PROJECT)" -scheme "$(SCHEME)" -configuration "$(CONFIGURATION)" -derivedDataPath "$(DERIVED_DATA)" build
+	test -f "$(RECORDING_CUE_PATH)"
 	./scripts/sign-local.sh "$(APP_PATH)"
 	./scripts/verify-local-signing.sh "$(APP_PATH)"
 
