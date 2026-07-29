@@ -84,6 +84,8 @@ struct RecordingVisualizer: View {
 /// syllable onsets. Resampling to a few dozen buckets and curving through them keeps the
 /// line smooth while the meter itself stays instant.
 private struct EmberVisualizer: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let levels: [Double]
     let live: Double
     let sparks: [EmberSparkField.Spark]
@@ -93,27 +95,54 @@ private struct EmberVisualizer: View {
 
     private static let inset: CGFloat = 2.5
     private static let glow = Color(red: 0.98, green: 0.68, blue: 0.34)
+    private static let idleVoiceCutoff = 0.22
 
     var body: some View {
         Canvas { context, size in
             let geometry = TraceGeometry(size: size, inset: Self.inset)
 
             drawTrail(in: &context, geometry: geometry)
-            drawSparks(in: &context, geometry: geometry)
+            if !reduceMotion {
+                drawSparks(in: &context, geometry: geometry)
+            }
             drawHead(in: &context, geometry: geometry)
         }
     }
 
-    /// Keeps silence breathing instead of flatlining.
+    /// Keeps a visible pilot light during pauses without making silence resemble speech.
     private func restingLevel(at index: Int) -> Double {
-        0.05 + 0.028 * sin(time * 1.7 + Double(index) * 0.42)
+        guard !reduceMotion else { return 0.1 }
+
+        let travelingWave = (sin(idlePhase + Double(index) * 0.46) + 1) / 2
+        let shimmer = sin(idlePhase * 2 - Double(index) * 0.21)
+        return 0.07 + 0.105 * travelingWave + 0.012 * shimmer
+    }
+
+    /// Fades idle motion out as soon as real voice energy becomes visible.
+    private func silenceMix(for level: Double) -> Double {
+        let voicePresence = min(max(level / Self.idleVoiceCutoff, 0), 1)
+        let smoothVoicePresence = voicePresence * voicePresence * (3 - 2 * voicePresence)
+        return 1 - smoothVoicePresence
+    }
+
+    private var idlePhase: Double {
+        time * 2.4
+    }
+
+    private var idleEnergy: Double {
+        let breath = reduceMotion ? 0.5 : (sin(idlePhase) + 1) / 2
+        return silenceMix(for: live) * (0.62 + 0.38 * breath)
+    }
+
+    private func displayedLevel(_ level: Double, at index: Int) -> Double {
+        max(level, restingLevel(at: index) * silenceMix(for: level))
     }
 
     private func drawTrail(in context: inout GraphicsContext, geometry: TraceGeometry) {
         let points = levels.enumerated().map { index, level in
             CGPoint(
                 x: geometry.x(progress: Double(index) / Double(max(levels.count - 1, 1))),
-                y: geometry.y(level: max(level, restingLevel(at: index)))
+                y: geometry.y(level: displayedLevel(level, at: index))
             )
         }
 
@@ -130,7 +159,11 @@ private struct EmberVisualizer: View {
                 startPoint: .zero,
                 endPoint: CGPoint(x: geometry.size.width, y: 0)
             ),
-            style: StrokeStyle(lineWidth: 1.4 + live * 1.3, lineCap: .round, lineJoin: .round)
+            style: StrokeStyle(
+                lineWidth: 1.4 + live * 1.3 + idleEnergy * 0.45,
+                lineCap: .round,
+                lineJoin: .round
+            )
         )
     }
 
@@ -157,22 +190,26 @@ private struct EmberVisualizer: View {
     private func drawHead(in context: inout GraphicsContext, geometry: TraceGeometry) {
         let center = CGPoint(
             x: geometry.x(progress: 1),
-            y: geometry.y(level: max(live, restingLevel(at: levels.count - 1)))
+            y: geometry.y(level: displayedLevel(live, at: levels.count - 1))
         )
-        let core = 1.5 + live * 1.9
+        let core = 1.5 + live * 1.9 + idleEnergy * 0.65
+        let haloRadius = core * (2.6 + idleEnergy * 0.55)
 
         context.fill(
             Path(ellipseIn: CGRect(
-                x: center.x - core * 2.6,
-                y: center.y - core * 2.6,
-                width: core * 5.2,
-                height: core * 5.2
+                x: center.x - haloRadius,
+                y: center.y - haloRadius,
+                width: haloRadius * 2,
+                height: haloRadius * 2
             )),
             with: .radialGradient(
-                Gradient(colors: [Self.glow.opacity(0.3 + 0.35 * live), Self.glow.opacity(0)]),
+                Gradient(colors: [
+                    Self.glow.opacity(0.3 + 0.35 * live + 0.22 * idleEnergy),
+                    Self.glow.opacity(0)
+                ]),
                 center: center,
                 startRadius: 0,
-                endRadius: core * 2.6
+                endRadius: haloRadius
             )
         )
 
