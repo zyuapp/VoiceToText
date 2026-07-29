@@ -2,7 +2,7 @@ import Foundation
 
 /// Smooths the mapped 0...1 level over time.
 ///
-/// `AdaptiveAudioLevelMapper` decides how loud a frame is; this decides how fast the
+/// `AudioLevelMapper` decides how loud a frame is; this decides how fast the
 /// indicator is allowed to follow. Attack is near-instant so syllables register, and
 /// release is short enough that the trail falls between words — speech syllables run
 /// 150-250 ms, so anything slower reads as not responding at all.
