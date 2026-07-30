@@ -6,14 +6,12 @@ import SwiftUI
 final class RecordingOverlayModel: ObservableObject {
     @Published var isPresented = false
     @Published var isExpanded = false
-    @Published var style = RecordingVisualizerStyle.default
     @Published var targetAppIcon: NSImage
     @Published var targetAppName = "Current app"
 
     /// Level samples live outside `@Published` so 60 Hz metering never invalidates the
     /// pill's layout; the visualizer reads the track from its own timeline instead.
     let levelTrack = RecordingLevelTrack()
-    let sparkField = EmberSparkField()
 
     init() {
         targetAppIcon = NSImage(
@@ -40,11 +38,6 @@ final class RecordingOverlayController {
     private var previewStartTime = Date.timeIntervalSinceReferenceDate
     private var presentationGeneration = 0
 
-    var style: RecordingVisualizerStyle {
-        get { model.style }
-        set { model.style = newValue }
-    }
-
     func show(
         targetApplication: NSRunningApplication?,
         levelProvider: @escaping (TimeInterval) -> Double
@@ -55,7 +48,7 @@ final class RecordingOverlayController {
         animateIn()
     }
 
-    func showPreview(targetApplication: NSRunningApplication?, duration: TimeInterval? = nil) {
+    func showPreview(targetApplication: NSRunningApplication?) {
         presentationGeneration += 1
         previewStartTime = Date.timeIntervalSinceReferenceDate
         preparePresentation(targetApplication: targetApplication)
@@ -63,7 +56,6 @@ final class RecordingOverlayController {
             self?.simulatedAudioLevel() ?? 0
         }
         animateIn()
-        scheduleAutomaticHide(after: duration)
     }
 
     func hide() {
@@ -87,7 +79,6 @@ final class RecordingOverlayController {
             guard let self, self.presentationGeneration == generation else { return }
             self.panel.orderOut(nil)
             self.model.levelTrack.clear()
-            self.model.sparkField.clear()
         }
     }
 }
@@ -122,7 +113,6 @@ private extension RecordingOverlayController {
     func preparePresentation(targetApplication: NSRunningApplication?) {
         model.updateTargetApplication(targetApplication)
         model.levelTrack.clear()
-        model.sparkField.clear()
         model.isPresented = false
         model.isExpanded = false
 
@@ -146,16 +136,6 @@ private extension RecordingOverlayController {
                     self.model.isExpanded = true
                 }
             }
-        }
-    }
-
-    func scheduleAutomaticHide(after duration: TimeInterval?) {
-        guard let duration else { return }
-
-        let generation = presentationGeneration
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
-            guard let self, self.presentationGeneration == generation else { return }
-            self.hide()
         }
     }
 
@@ -202,7 +182,6 @@ private extension RecordingOverlayController {
         let deltaTime = min(max(elapsed, 0), Self.maximumDeltaTime)
         let level = min(max(levelProvider(deltaTime), 0), 1)
         model.levelTrack.append(level: level, at: now)
-        model.sparkField.advance(level: level, deltaTime: deltaTime)
     }
 
     func stopLevelUpdates() {
@@ -265,7 +244,7 @@ private struct LiquidGlassRecordingOverlay: View {
     var body: some View {
         if model.isExpanded {
             RecordingPill(model: model)
-                .frame(width: model.style.pillWidth, height: 54)
+                .frame(width: 300, height: 54)
                 .glassEffect(.regular, in: Capsule())
                 .glassEffectTransition(.materialize)
                 .transition(
@@ -282,7 +261,7 @@ private struct LegacyRecordingOverlay: View {
     var body: some View {
         if model.isExpanded {
             RecordingPill(model: model)
-                .frame(width: model.style.pillWidth, height: 54)
+                .frame(width: 300, height: 54)
                 .background(.ultraThinMaterial, in: Capsule())
                 .overlay {
                     Capsule().stroke(.white.opacity(0.28), lineWidth: 0.75)
@@ -311,11 +290,7 @@ private struct RecordingPill: View {
         HStack(spacing: 11) {
             TargetAppIcon(model: model)
 
-            RecordingVisualizer(
-                style: model.style,
-                track: model.levelTrack,
-                sparkField: model.sparkField
-            )
+            RecordingVisualizer(track: model.levelTrack)
 
             Divider()
                 .frame(height: 24)

@@ -48,34 +48,4 @@ final class RecordingLevelTrack {
         return result
     }
 
-    /// Loudest level in each of `buckets` equal time slices ending at `now`, oldest first.
-    /// Resampling in space keeps the drawing smooth without slowing the meter down.
-    func resample(now: TimeInterval, span: TimeInterval, buckets: Int) -> [Double] {
-        var levels = [Double](repeating: 0, count: buckets)
-
-        for offset in 0..<count {
-            let sample = storage[(head - count + offset + storage.count) % storage.count]
-            let age = now - sample.time
-
-            guard age >= 0, age <= span else { continue }
-
-            let index = min(Int((1 - age / span) * Double(buckets)), buckets - 1)
-            levels[index] = max(levels[index], sample.level)
-        }
-
-        return levels
-    }
-
-    /// Level recorded at or just before `time`, or 0 when the track has nothing that old.
-    func level(at time: TimeInterval) -> Double {
-        for offset in stride(from: count - 1, through: 0, by: -1) {
-            let sample = storage[(head - count + offset + storage.count) % storage.count]
-
-            if sample.time <= time {
-                return sample.level
-            }
-        }
-
-        return 0
-    }
 }
