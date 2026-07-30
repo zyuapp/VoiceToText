@@ -6,7 +6,7 @@ A lightweight macOS menu bar app for fully offline voice dictation. Hold your re
 
 ## Features
 
-- **Offline Transcription** - Core speech-to-text runs locally with Parakeet on sherpa-onnx
+- **Offline Transcription** - Core speech-to-text runs locally with Parakeet on Apple’s Neural Engine
 - **System-Wide** - Works in any application where you can type
 - **Customizable Shortcut** - Hold Right Command by default, or record your preferred shortcut
 - **Cancel Anytime** - Press Escape while holding to cancel recording
@@ -16,8 +16,8 @@ A lightweight macOS menu bar app for fully offline voice dictation. Hold your re
 
 ## Requirements
 
-- macOS 13.0 or later
-- Apple Silicon (M1/M2/M3) recommended
+- macOS 14.6 or later
+- Apple Silicon
 - Microphone access permission
 
 ## Installation
@@ -37,10 +37,9 @@ Note: builds are currently unsigned and not notarized, so macOS may show a secur
 ### Build from Source
 
 ```bash
-# Clone and setup
+# Clone
 git clone https://github.com/zyuapp/just-speak.git
 cd just-speak
-./setup-parakeet.sh
 
 # Build with local development signing
 make build
@@ -72,7 +71,7 @@ releases are packaged.
 
 - **SwiftUI + AppKit** - Menu bar app with NSApplicationDelegateAdaptor
 - **AVFoundation** - Native audio recording (16kHz mono WAV)
-- **sherpa-onnx** - Local Parakeet inference through ONNX Runtime
+- **FluidAudio + CoreML** - Local Parakeet inference on Apple’s Neural Engine
 - **Native Integration** - Uses macOS microphone and accessibility APIs directly
 
 ## Development
@@ -83,5 +82,5 @@ Third-party attributions and license texts are bundled with the app under
 
 ## Acknowledgments
 
-- [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) - On-device speech recognition runtime
+- [FluidAudio](https://github.com/FluidInference/FluidAudio) - CoreML speech recognition runtime
 - [NVIDIA Parakeet TDT 0.6B v2](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2) - English speech recognition model

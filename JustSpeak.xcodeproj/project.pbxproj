@@ -6,15 +6,27 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		FA0000030000000000000001 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = FA0000020000000000000001 /* FluidAudio */; };
+		FA10000B0000000000000001 /* CoreMLTranscriptionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA10000A0000000000000001 /* CoreMLTranscriptionEngine.swift */; };
+		FA10000D0000000000000001 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = FA10000C0000000000000001 /* FluidAudio */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
-		BC000001000000000065341A /* Parakeet.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Parakeet.xcconfig; sourceTree = "<group>"; };
 		BCFDA99F2EC2EDEC0065341A /* JustSpeak.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JustSpeak.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FA1000010000000000000001 /* JustSpeakPerformanceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JustSpeakPerformanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		FA10000A0000000000000001 /* CoreMLTranscriptionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JustSpeak/CoreMLTranscriptionEngine.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		BCFDA9A12EC2EDEC0065341A /* JustSpeak */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = JustSpeak;
+			sourceTree = "<group>";
+		};
+		FA1000020000000000000001 /* JustSpeakPerformanceTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = JustSpeakPerformanceTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -24,6 +36,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FA0000030000000000000001 /* FluidAudio in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA1000030000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA10000D0000000000000001 /* FluidAudio in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -34,8 +55,8 @@
 			isa = PBXGroup;
 			children = (
 				BCFDA9A12EC2EDEC0065341A /* JustSpeak */,
+				FA1000020000000000000001 /* JustSpeakPerformanceTests */,
 				BCFDA9A02EC2EDEC0065341A /* Products */,
-				BCFDAA092EC313040065341A /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -43,16 +64,9 @@
 			isa = PBXGroup;
 			children = (
 				BCFDA99F2EC2EDEC0065341A /* JustSpeak.app */,
+				FA1000010000000000000001 /* JustSpeakPerformanceTests.xctest */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		BCFDAA092EC313040065341A /* Recovered References */ = {
-			isa = PBXGroup;
-			children = (
-				BC000001000000000065341A /* Parakeet.xcconfig */,
-			);
-			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -75,10 +89,34 @@
 			);
 			name = JustSpeak;
 			packageProductDependencies = (
+				FA0000020000000000000001 /* FluidAudio */,
 			);
 			productName = JustSpeak;
 			productReference = BCFDA99F2EC2EDEC0065341A /* JustSpeak.app */;
 			productType = "com.apple.product-type.application";
+		};
+		FA1000060000000000000001 /* JustSpeakPerformanceTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FA1000070000000000000001 /* Build configuration list for PBXNativeTarget "JustSpeakPerformanceTests" */;
+			buildPhases = (
+				FA1000040000000000000001 /* Sources */,
+				FA1000030000000000000001 /* Frameworks */,
+				FA1000050000000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				FA1000020000000000000001 /* JustSpeakPerformanceTests */,
+			);
+			name = JustSpeakPerformanceTests;
+			packageProductDependencies = (
+				FA10000C0000000000000001 /* FluidAudio */,
+			);
+			productName = JustSpeakPerformanceTests;
+			productReference = FA1000010000000000000001 /* JustSpeakPerformanceTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -91,6 +129,9 @@
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					BCFDA99E2EC2EDEC0065341A = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
+					FA1000060000000000000001 = {
 						CreatedOnToolsVersion = 26.0.1;
 					};
 				};
@@ -106,16 +147,27 @@
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BCFDA9A02EC2EDEC0065341A /* Products */;
+			packageReferences = (
+				FA0000010000000000000001 /* XCRemoteSwiftPackageReference "FluidAudio" */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				BCFDA99E2EC2EDEC0065341A /* JustSpeak */,
+				FA1000060000000000000001 /* JustSpeakPerformanceTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		BCFDA99D2EC2EDEC0065341A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA1000050000000000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -132,12 +184,19 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FA1000040000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA10000B0000000000000001 /* CoreMLTranscriptionEngine.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
 		BCFDA9A82EC2EDED0065341A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = BC000001000000000065341A /* Parakeet.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -199,7 +258,6 @@
 		};
 		BCFDA9A92EC2EDED0065341A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = BC000001000000000065341A /* Parakeet.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -349,6 +407,48 @@
 			};
 			name = Release;
 		};
+		FA1000080000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGNING_ALLOWED = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.zyu.just-speak.performance-tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		FA1000090000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGNING_ALLOWED = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.zyu.just-speak.performance-tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -370,7 +470,40 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		FA1000070000000000000001 /* Build configuration list for PBXNativeTarget "JustSpeakPerformanceTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FA1000080000000000000001 /* Debug */,
+				FA1000090000000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		FA0000010000000000000001 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.12.6;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		FA0000020000000000000001 /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FA0000010000000000000001 /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
+		};
+		FA10000C0000000000000001 /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FA0000010000000000000001 /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = BCFDA9972EC2EDEC0065341A /* Project object */;
 }

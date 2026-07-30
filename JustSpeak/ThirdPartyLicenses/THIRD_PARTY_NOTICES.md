@@ -7,24 +7,21 @@
 - License: Creative Commons Attribution 4.0 International
 - License text: https://creativecommons.org/licenses/by/4.0/legalcode
 
-JustSpeak downloads an INT8 ONNX conversion packaged for sherpa-onnx. The
+JustSpeak downloads a CoreML conversion packaged by FluidInference. The
 conversion and packaging differ from NVIDIA's original distribution. NVIDIA
 does not endorse JustSpeak.
 
-## Native runtime
+## CoreML runtime
 
-JustSpeak statically links the sherpa-onnx 1.13.3 macOS arm64 runtime and its
-runtime dependencies:
+JustSpeak uses FluidAudio for on-device CoreML inference:
 
-- sherpa-onnx, Kaldi decoder, kaldi-native-fbank, kaldifst, OpenFST, and
-  simple-sentencepiece: Apache License 2.0
-- ONNX Runtime: MIT License with third-party notices
-- KissFFT: BSD 3-Clause License
+- FluidAudio: Apache License 2.0
+- swift-transformers and swift-huggingface: Apache License 2.0
+- Swift package transitive dependencies retain their upstream licenses
 
 Source and license materials:
 
-- https://github.com/k2-fsa/sherpa-onnx/tree/v1.13.3
-- https://github.com/microsoft/onnxruntime
+- https://github.com/FluidInference/FluidAudio/tree/v0.12.6
+- https://github.com/huggingface/swift-transformers
 
-The full license and third-party notice texts shipped with the app are in this
-directory.
+The FluidAudio Apache license text shipped with the app is in this directory.

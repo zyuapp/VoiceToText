@@ -123,7 +123,7 @@
       You may add Your own copyright statement to Your modifications and
       may provide additional or different license terms and conditions
       for use, reproduction, or distribution of Your modifications, or
-      for any such Derivative Works as a whole, provided Your use,
+      for any such Derivative Works as a whole, provided your use,
       reproduction, and distribution of the Work otherwise complies with
       the conditions stated in this License.
 
@@ -148,7 +148,7 @@
       of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
       PARTICULAR PURPOSE. You are solely responsible for determining the
       appropriateness of using or redistributing the Work and assume any
-      risks associated with Your exercise of permissions under this License.
+      risks associated with your exercise of permissions under this License.
 
    8. Limitation of Liability. In no event and under no legal theory,
       whether in tort (including negligence), contract, or otherwise,
@@ -167,7 +167,7 @@
       and charge a fee for, acceptance of support, warranty, indemnity,
       or other liability obligations and/or rights consistent with this
       License. However, in accepting such obligations, You may act only
-      on Your own behalf and on Your sole responsibility, not on behalf
+      on your own behalf and on your sole responsibility, not on behalf
       of any other Contributor, and only if You agree to indemnify,
       defend, and hold each Contributor harmless for any liability
       incurred by, or claims asserted against, such Contributor by reason

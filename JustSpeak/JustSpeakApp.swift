@@ -394,7 +394,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             updateStatusIcon(downloading: true)
             showNotification(
                 title: "Downloading Model",
-                body: "First time setup: downloading Parakeet model (~460 MB)"
+                body: "First time setup: downloading the optimized Parakeet model"
             )
 
             transcriptionService.downloadModelIfNeeded { [weak self] progress in
@@ -634,13 +634,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             print("Recording too short (\(String(format: "%.1f", duration))s), ignoring")
             AudioRecorder.removeRecordingFile(at: recordingURL)
             return
-        }
-
-        if duration > 60 {
-            showNotification(
-                title: "Recording Too Long",
-                body: "Recording limited to 60 seconds. Processing first 60 seconds..."
-            )
         }
 
         processRecording(url: recordingURL)
