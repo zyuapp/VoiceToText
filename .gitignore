@@ -128,8 +128,5 @@ Recordings/
 # Claude Code local settings
 .claude/settings.local.json
 
-# Native speech runtime dependencies
-sherpa-onnx/
-
 # Xcode project backup
 *.pbxproj.backup

@@ -4,14 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Native macOS menu bar app for offline voice dictation powered by Parakeet on sherpa-onnx. Users hold a hotkey to record audio, which is transcribed locally and auto-pasted at the cursor.
+Native macOS menu bar app for offline voice dictation powered by Parakeet on FluidAudio/CoreML. Users hold a hotkey to record audio, which is transcribed locally and auto-pasted at the cursor.
 
 ## Setup and Build Commands
 
 ```bash
-# Install sherpa-onnx static libraries (required before first app build)
-./setup-parakeet.sh
-
 # Build the app with a dynamically selected local signing identity
 make build
 
@@ -19,14 +16,14 @@ make build
 make install
 
 # Open downloaded model directory
-open ~/Library/Application\ Support/just-speak/Models/
+open ~/Library/Application\ Support/FluidAudio/Models/
 ```
 
-If build errors mention missing sherpa-onnx or ONNX Runtime symbols, run `./setup-parakeet.sh` again.
+Swift Package Manager resolves the pinned FluidAudio dependency during the first build.
 
 ## Runtime Paths
 
-- Parakeet model path: `~/Library/Application Support/just-speak/Models/parakeet/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/`
+- Parakeet model path: `~/Library/Application Support/FluidAudio/Models/parakeet-tdt-0.6b-v2-coreml/`
 - Recordings are written to `FileManager.default.temporaryDirectory` as `recording_<timestamp>.wav`
 - Temporary recordings are deleted after transcription or cancellation
 
@@ -43,9 +40,7 @@ If build errors mention missing sherpa-onnx or ONNX Runtime symbols, run `./setu
 - `HotkeyManager` (`HotkeyManager.swift`): global event tap for Right Command down/up and Escape cancel
 - `AudioRecorder` (`AudioRecorder.swift`): `AVAudioRecorder` wrapper plus CoreAudio input-device selection
 - `TranscriptionService` (`TranscriptionService.swift`): model lifecycle and async transcription entry point
-- `ModelDownloader` (`ModelDownloader.swift`): verified first-run model download and installation
-- `ParakeetWrapper` (`ParakeetWrapper.swift`): audio loading and Swift interface to Parakeet
-- `ParakeetBridge` (`ParakeetBridge.mm`): sherpa-onnx C API configuration and inference
+- `CoreMLTranscriptionEngine` (`CoreMLTranscriptionEngine.swift`): serialized FluidAudio model loading and Neural Engine inference
 - `ClipboardManager` (`ClipboardManager.swift`): copy result and synthesize Command+V paste
 
 **Function Size Constraint:**
@@ -80,6 +75,6 @@ AVFormatIDKey: kAudioFormatLinearPCM
 
 ## Non-Obvious Gotchas
 
-- First launch downloads the Parakeet archive (~460 MB). App is not transcription-ready until download, verification, extraction, and `TranscriptionService.initialize()` complete.
-- `JustSpeakApp.handleHotkeyUp()` warns when duration is over 60s, but does not trim audio yet. If you change duration UX, keep behavior and messaging aligned.
-- `Parakeet.xcconfig` links static libs from `sherpa-onnx/lib`; if that folder is removed, run `./setup-parakeet.sh` again.
+- First launch downloads and compiles the CoreML Parakeet models. The app is not transcription-ready until `TranscriptionService.initialize()` completes.
+- FluidAudio automatically switches long recordings to its memory-bounded file streaming path.
+- `make performance-test` runs the real one-minute speech benchmark and requires at least 20× real-time steady-state transcription.

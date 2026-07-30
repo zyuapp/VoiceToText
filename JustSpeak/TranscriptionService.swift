@@ -1,89 +1,68 @@
 import Foundation
 
-enum TranscriptionServiceError: Error {
-    case modelNotDownloaded
-    case parakeetInitFailed
-    case transcriptionFailed(String)
-}
-
 final class TranscriptionService {
     static let shared = TranscriptionService()
 
-    private var parakeet: ParakeetWrapper?
-    private let modelDownloader = ModelDownloader.shared
-    private let inferenceQueue = DispatchQueue(
-        label: "com.zyu.just-speak.parakeet",
-        qos: .userInitiated
-    )
+    private let engine: CoreMLTranscriptionEngine
+    private var ready = false
+
+    init(engine: CoreMLTranscriptionEngine = CoreMLTranscriptionEngine()) {
+        self.engine = engine
+    }
 
     var isReady: Bool {
-        parakeet != nil
+        ready
     }
 
     var isModelDownloaded: Bool {
-        modelDownloader.isModelDownloaded
+        engine.isModelDownloaded
     }
 
     func initialize() async throws {
-        guard modelDownloader.isModelDownloaded else {
-            throw TranscriptionServiceError.modelNotDownloaded
-        }
-
-        let modelFiles = modelDownloader.modelFiles
-        do {
-            parakeet = try await withCheckedThrowingContinuation { continuation in
-                inferenceQueue.async {
-                    do {
-                        let wrapper = try ParakeetWrapper(modelFiles: modelFiles)
-                        continuation.resume(returning: wrapper)
-                    } catch {
-                        continuation.resume(throwing: error)
-                    }
-                }
-            }
-        } catch {
-            throw TranscriptionServiceError.parakeetInitFailed
-        }
+        try await engine.initialize()
+        ready = await engine.isReady
     }
 
     func downloadModelIfNeeded(
-        progress: @escaping (Double) -> Void,
-        completion: @escaping (Result<Void, Error>) -> Void
+        progress: @escaping @MainActor @Sendable (Double) -> Void,
+        completion: @escaping @MainActor @Sendable (Result<Void, Error>) -> Void
     ) {
-        modelDownloader.downloadModel { downloadProgress in
-            progress(downloadProgress)
-        } completion: { [weak self] result in
-            switch result {
-            case .success:
-                Task {
-                    guard let self else { return }
-                    do {
-                        try await self.initialize()
-                        completion(.success(()))
-                    } catch {
-                        completion(.failure(error))
-                    }
-                }
-            case .failure(let error):
-                completion(.failure(error))
+        let (progressStream, progressContinuation) = AsyncStream<Double>.makeStream()
+        let progressDelivery = Task {
+            for await downloadProgress in progressStream {
+                progress(downloadProgress)
             }
+        }
+
+        Task { [weak self] in
+            guard let self else {
+                progressContinuation.finish()
+                await progressDelivery.value
+                return
+            }
+
+            let result: Result<Void, Error>
+            do {
+                try await engine.downloadAndInitialize { downloadProgress in
+                    progressContinuation.yield(downloadProgress)
+                }
+                ready = await engine.isReady
+                result = .success(())
+            } catch {
+                result = .failure(error)
+            }
+
+            progressContinuation.finish()
+            await progressDelivery.value
+            completion(result)
         }
     }
 
     func transcribe(audioFile: URL) async throws -> String {
-        guard let parakeet = parakeet else {
-            throw TranscriptionServiceError.modelNotDownloaded
+        guard ready else {
+            throw CoreMLTranscriptionEngineError.modelNotDownloaded
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
-            inferenceQueue.async {
-                do {
-                    let text = try parakeet.transcribe(audioFile: audioFile)
-                    continuation.resume(returning: text)
-                } catch {
-                    continuation.resume(throwing: TranscriptionServiceError.transcriptionFailed(error.localizedDescription))
-                }
-            }
-        }
+        return try await engine.transcribe(audioFile: audioFile)
     }
 }
