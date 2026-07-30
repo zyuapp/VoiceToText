@@ -5,3 +5,4 @@
 
 # Development
 - I prefer you to run `make install` to override my current app during development if you need to verify the changes. This is much easier than juggling multiple instances of the app.
+- If `git` or `gh` fails because the sandbox blocks Git metadata, macOS Keychain credentials, or network access, retry the command with escalated permissions before reporting failure.
