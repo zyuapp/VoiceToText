@@ -698,7 +698,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         guard duration >= 0.5 else {
             print("Recording too short (\(String(format: "%.1f", duration))s), ignoring")
-            cleanupRecording(recordingURL)
+            AudioRecorder.removeRecordingFile(at: recordingURL)
             return
         }
 
@@ -759,7 +759,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 await MainActor.run {
                     updateStatusIcon()
                     handleTranscriptionResult(text)
-                    cleanupRecording(url)
+                    AudioRecorder.removeRecordingFile(at: url)
                 }
             } catch {
                 await MainActor.run {
@@ -774,7 +774,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         self?.updateStatusIcon()
                     }
 
-                    cleanupRecording(url)
+                    AudioRecorder.removeRecordingFile(at: url)
                 }
             }
         }
@@ -792,15 +792,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         transcriptHistory.add(trimmed)
         refreshTranscriptHistoryMenu()
         clipboardManager.copyAndPaste(trimmed)
-    }
-
-    private func cleanupRecording(_ url: URL) {
-        do {
-            try FileManager.default.removeItem(at: url)
-            print("Cleaned up recording: \(url.path)")
-        } catch {
-            print("Failed to cleanup recording: \(error)")
-        }
     }
 
     private func updateStatusIcon(recording: Bool = false, processing: Bool = false, downloading: Bool = false, error: Bool = false) {

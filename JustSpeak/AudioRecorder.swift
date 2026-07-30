@@ -58,7 +58,6 @@ class AudioRecorder: NSObject {
     private let captureQueue = DispatchQueue(label: "com.zyu.just-speak.audio-capture")
     private var captureSession: AVCaptureSession?
     private var audioFileOutput: AVCaptureAudioFileOutput?
-    private var recordingURL: URL?
     private var selectedDeviceUniqueID: String?
     private var activeAttemptID: UUID?
     private var pendingStartInfo: RecordingStartInfo?
@@ -69,10 +68,6 @@ class AudioRecorder: NSObject {
     private var isStarting = false
     private var audioLevelMapper = AdaptiveAudioLevelMapper()
     private var levelFollower = AudioLevelFollower()
-
-    var isRecording: Bool {
-        audioFileOutput?.isRecording ?? false
-    }
 
     /// Reads the meters and advances the level filter by `deltaTime` seconds, returning the
     /// filtered 0...1 level. `deltaTime` must be non-negative and modestly bounded.
@@ -167,7 +162,7 @@ class AudioRecorder: NSObject {
             } catch {
                 DispatchQueue.main.async { [weak self] in
                     self?.isStarting = false
-                    self?.removeRecordingFile(at: url)
+                    Self.removeRecordingFile(at: url)
                     completion(.failure(error))
                 }
             }
@@ -309,7 +304,6 @@ extension AudioRecorder {
     ) {
         captureSession = resources.session
         audioFileOutput = resources.output
-        recordingURL = url
         activeAttemptID = attemptID
         pendingStartInfo = info
         startCompletion = completion
@@ -394,7 +388,7 @@ extension AudioRecorder {
         shouldDiscard: Bool,
         completion: (Result<RecordingStartInfo, Error>) -> Void
     ) {
-        removeRecordingFile(at: url)
+        Self.removeRecordingFile(at: url)
         let failure = shouldDiscard
             ? RecorderError.recordingCancelled
             : error ?? RecorderError.recordingFailed
@@ -409,18 +403,18 @@ extension AudioRecorder {
         unexpectedFinish: ((Error) -> Void)?
     ) {
         if shouldDiscard {
-            removeRecordingFile(at: url)
+            Self.removeRecordingFile(at: url)
             return
         }
 
         guard let completion else {
-            removeRecordingFile(at: url)
+            Self.removeRecordingFile(at: url)
             unexpectedFinish?(error ?? RecorderError.recordingFailed)
             return
         }
 
         guard recordingFinishedSuccessfully(error: error) else {
-            removeRecordingFile(at: url)
+            Self.removeRecordingFile(at: url)
             completion(.failure(error ?? RecorderError.recordingFailed))
             return
         }
@@ -433,7 +427,6 @@ extension AudioRecorder {
         let session = captureSession
         captureSession = nil
         audioFileOutput = nil
-        recordingURL = nil
         activeAttemptID = nil
         pendingStartInfo = nil
         startCompletion = nil
@@ -459,7 +452,7 @@ extension AudioRecorder {
         }
     }
 
-    private func removeRecordingFile(at url: URL) {
+    static func removeRecordingFile(at url: URL) {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
 
         do {
