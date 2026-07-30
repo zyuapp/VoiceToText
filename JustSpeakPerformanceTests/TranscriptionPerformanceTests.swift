@@ -64,17 +64,21 @@ final class TranscriptionPerformanceTests: XCTestCase {
         )
     }
 
-    func testSubsecondSpeechStillTranscribes() async throws {
+    func testCachedModelTranscribesSubsecondSpeech() async throws {
         let fixture = try SpeechPerformanceFixture.makeShort()
         defer { fixture.remove() }
 
-        let engine = CoreMLTranscriptionEngine()
-        try await engine.downloadAndInitialize()
+        let setupEngine = CoreMLTranscriptionEngine()
+        try await setupEngine.downloadAndInitialize()
 
-        let measurement = try await transcribe(fixture.audioURL, using: engine)
+        let cachedEngine = CoreMLTranscriptionEngine()
+        XCTAssertTrue(cachedEngine.isModelDownloaded)
+        try await cachedEngine.initialize()
+
+        let measurement = try await transcribe(fixture.audioURL, using: cachedEngine)
         XCTAssertTrue(
             measurement.text.lowercased().contains(fixture.requiredEnding),
-            "Expected a subsecond recording to transcribe after minimum-length padding. "
+            "Expected cached startup and subsecond padding to preserve transcription. "
                 + "Transcript: \(measurement.text)"
         )
     }

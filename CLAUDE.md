@@ -12,6 +12,12 @@ Native macOS menu bar app for offline voice dictation powered by Parakeet on Flu
 # Build the app with a dynamically selected local signing identity
 make build
 
+# Run deterministic tests without model acquisition or performance thresholds
+make test
+
+# Run the real-speech CoreML performance benchmark
+make performance-test
+
 # Install a release build
 make install
 

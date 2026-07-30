@@ -1,30 +1,11 @@
-import FluidAudio
 import Foundation
 import XCTest
 
 final class CoreMLTranscriptionEngineTests: XCTestCase {
     func testModelSetupProgressStaysMonotonicAcrossFluidAudioPasses() {
         let setupProgress = ModelSetupProgress()
-        var reported: [Double] = []
-
-        for pass in 0..<7 {
-            reported.append(
-                setupProgress.normalize(
-                    .init(
-                        fractionCompleted: 0.5,
-                        phase: .downloading(completedFiles: pass, totalFiles: 7)
-                    )
-                )
-            )
-            reported.append(
-                setupProgress.normalize(
-                    .init(
-                        fractionCompleted: 1,
-                        phase: .compiling(modelName: "")
-                    )
-                )
-            )
-        }
+        let upstream = [0, 0.5, 1, 0.5, 1]
+        let reported = upstream.map(setupProgress.normalize)
 
         XCTAssertTrue(
             zip(reported, reported.dropFirst()).allSatisfy { pair in

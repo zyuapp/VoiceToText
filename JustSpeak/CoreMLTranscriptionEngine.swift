@@ -20,37 +20,21 @@ enum CoreMLTranscriptionEngineError: LocalizedError, Sendable {
 }
 
 nonisolated final class ModelSetupProgress: @unchecked Sendable {
-    // FluidAudio 0.12.6 performs four preparation passes and three final loading passes.
-    private static let loadingPassCount = 7
-    private static let modelLoadingShare = 0.95
+    private static let maximumBeforeReady = 0.95
 
     private let lock = NSLock()
-    private var completedPasses = 0
     private var lastReported = 0.0
 
-    func normalize(_ update: DownloadUtils.DownloadProgress) -> Double {
+    func normalize(_ upstreamFraction: Double) -> Double {
         lock.lock()
         defer { lock.unlock() }
 
-        let upstreamFraction = min(max(update.fractionCompleted, 0), 1)
-        let aggregateFraction =
-            (Double(completedPasses) + upstreamFraction)
-            / Double(Self.loadingPassCount)
-        let normalized = min(aggregateFraction, 1) * Self.modelLoadingShare
-
-        if completesLoadingPass(update) {
-            completedPasses = min(completedPasses + 1, Self.loadingPassCount)
-        }
-
+        let normalized = min(
+            max(upstreamFraction, 0),
+            Self.maximumBeforeReady
+        )
         lastReported = max(lastReported, normalized)
         return lastReported
-    }
-
-    private func completesLoadingPass(
-        _ update: DownloadUtils.DownloadProgress
-    ) -> Bool {
-        guard case .compiling(let modelName) = update.phase else { return false }
-        return modelName.isEmpty && update.fractionCompleted >= 1
     }
 }
 
@@ -68,13 +52,6 @@ actor CoreMLTranscriptionEngine {
     nonisolated var isModelDownloaded: Bool {
         let directory = AsrModels.defaultCacheDirectory(for: Self.modelVersion)
         return AsrModels.modelsExist(at: directory, version: Self.modelVersion)
-    }
-
-    var isReady: Bool {
-        get async {
-            guard let manager else { return false }
-            return await manager.isAvailable
-        }
     }
 
     func initialize() async throws {
@@ -102,7 +79,7 @@ actor CoreMLTranscriptionEngine {
             let models = try await AsrModels.downloadAndLoad(
                 version: Self.modelVersion
             ) { update in
-                progress?(setupProgress.normalize(update))
+                progress?(setupProgress.normalize(update.fractionCompleted))
             }
             try await configureManager(with: models)
             progress?(1)

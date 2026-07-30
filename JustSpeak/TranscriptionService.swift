@@ -1,5 +1,20 @@
 import Foundation
 
+enum TranscriptionServiceError: LocalizedError, Sendable {
+    case modelNotDownloaded
+    case modelSetupFailed(String)
+    case transcriptionFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .modelNotDownloaded:
+            return "The Parakeet model is not downloaded."
+        case .modelSetupFailed(let message), .transcriptionFailed(let message):
+            return message
+        }
+    }
+}
+
 final class TranscriptionService {
     static let shared = TranscriptionService()
 
@@ -19,14 +34,21 @@ final class TranscriptionService {
     }
 
     func initialize() async throws {
-        try await engine.initialize()
-        ready = await engine.isReady
+        ready = false
+
+        do {
+            try await engine.initialize()
+            ready = true
+        } catch {
+            throw TranscriptionServiceError.modelSetupFailed(error.localizedDescription)
+        }
     }
 
     func downloadModelIfNeeded(
         progress: @escaping @MainActor @Sendable (Double) -> Void,
         completion: @escaping @MainActor @Sendable (Result<Void, Error>) -> Void
     ) {
+        ready = false
         let (progressStream, progressContinuation) = AsyncStream<Double>.makeStream()
         let progressDelivery = Task {
             for await downloadProgress in progressStream {
@@ -46,10 +68,13 @@ final class TranscriptionService {
                 try await engine.downloadAndInitialize { downloadProgress in
                     progressContinuation.yield(downloadProgress)
                 }
-                ready = await engine.isReady
+                ready = true
                 result = .success(())
             } catch {
-                result = .failure(error)
+                ready = false
+                result = .failure(
+                    TranscriptionServiceError.modelSetupFailed(error.localizedDescription)
+                )
             }
 
             progressContinuation.finish()
@@ -60,9 +85,13 @@ final class TranscriptionService {
 
     func transcribe(audioFile: URL) async throws -> String {
         guard ready else {
-            throw CoreMLTranscriptionEngineError.modelNotDownloaded
+            throw TranscriptionServiceError.modelNotDownloaded
         }
 
-        return try await engine.transcribe(audioFile: audioFile)
+        do {
+            return try await engine.transcribe(audioFile: audioFile)
+        } catch {
+            throw TranscriptionServiceError.transcriptionFailed(error.localizedDescription)
+        }
     }
 }
