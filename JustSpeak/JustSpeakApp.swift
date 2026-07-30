@@ -24,7 +24,7 @@ struct JustSpeakApp: App {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let shortcutStore = RecordingShortcutStore()
     lazy var shortcutCaptureController = ShortcutCaptureController(
         store: shortcutStore
@@ -48,6 +48,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var downloadProgressMenuItem: NSMenuItem?
     private var accessibilityMenuItem: NSMenuItem?
     private let transcriptHistoryMenu = NSMenu()
+    private let audioInputMenu = NSMenu()
     private var shortcutMenuItem: NSMenuItem?
     private var subscriptions = Set<AnyCancellable>()
     private static let selectedDeviceKey = "selectedAudioInputDevice"
@@ -156,13 +157,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         refreshTranscriptHistoryMenu()
 
         let audioInputItem = NSMenuItem(title: "Audio Input", action: nil, keyEquivalent: "")
-        audioInputItem.submenu = createAudioInputSubmenu()
+        audioInputMenu.delegate = self
+        refreshAudioInputMenu()
+        audioInputItem.submenu = audioInputMenu
         menu.addItem(audioInputItem)
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
 
         statusItem?.menu = menu
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        guard menu === audioInputMenu else { return }
+        refreshAudioInputMenu()
     }
 
     private func refreshTranscriptHistoryMenu() {
@@ -252,10 +260,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         shortcutSettingsWindowController.present()
     }
 
-    private func createAudioInputSubmenu() -> NSMenu {
-        let submenu = NSMenu()
+    private func refreshAudioInputMenu() {
+        audioInputMenu.removeAllItems()
+
         let devices = AudioRecorder.getAvailableInputDevices()
         let savedDeviceID = UserDefaults.standard.string(forKey: Self.selectedDeviceKey)
+        let savedDeviceIsAvailable = devices.contains {
+            $0.uniqueID == savedDeviceID
+        }
 
         let defaultItem = NSMenuItem(
             title: "System Default",
@@ -263,11 +275,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             keyEquivalent: ""
         )
         defaultItem.target = self
-        defaultItem.state = savedDeviceID == nil ? .on : .off
-        submenu.addItem(defaultItem)
+        defaultItem.state = savedDeviceID == nil || !savedDeviceIsAvailable ? .on : .off
+        audioInputMenu.addItem(defaultItem)
 
         if !devices.isEmpty {
-            submenu.addItem(NSMenuItem.separator())
+            audioInputMenu.addItem(NSMenuItem.separator())
         }
 
         for device in devices {
@@ -279,18 +291,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             item.target = self
             item.representedObject = device.uniqueID
             item.state = device.uniqueID == savedDeviceID ? .on : .off
-            submenu.addItem(item)
+            audioInputMenu.addItem(item)
         }
-
-        return submenu
     }
 
     @objc private func selectAudioDevice(_ sender: NSMenuItem) {
-        guard let menu = statusItem?.menu,
-              let audioInputItem = menu.items.first(where: { $0.title == "Audio Input" }),
-              let submenu = audioInputItem.submenu else { return }
-
-        for item in submenu.items {
+        for item in audioInputMenu.items {
             item.state = .off
         }
 
