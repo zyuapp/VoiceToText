@@ -24,7 +24,7 @@ struct JustSpeakApp: App {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let shortcutStore = RecordingShortcutStore()
     lazy var shortcutCaptureController = ShortcutCaptureController(
         store: shortcutStore
@@ -43,10 +43,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         captureController: shortcutCaptureController
     )
     private var isRecordingHotkeyHeld = false
+    private var recordingAttemptID: UUID?
     private var recordingStartTime: Date?
     private var downloadProgressMenuItem: NSMenuItem?
     private var accessibilityMenuItem: NSMenuItem?
     private let transcriptHistoryMenu = NSMenu()
+    private let audioInputMenu = NSMenu()
     private var shortcutMenuItem: NSMenuItem?
     private var subscriptions = Set<AnyCancellable>()
     private static let selectedDeviceKey = "selectedAudioInputDevice"
@@ -56,6 +58,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         requestNotificationPermission()
         migrateLegacyPreferencesIfNeeded()
+        migrateSelectedAudioInputPreferenceIfNeeded()
         observeShortcutSettings()
         setupStatusItem()
         setupMenus()
@@ -101,6 +104,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         defaults.set(true, forKey: Self.didMigratePreferencesKey)
     }
 
+    private func migrateSelectedAudioInputPreferenceIfNeeded() {
+        let defaults = UserDefaults.standard
+
+        guard let storedPreference = defaults.object(forKey: Self.selectedDeviceKey),
+              !(storedPreference is String),
+              let storedDeviceID = storedPreference as? NSNumber else { return }
+
+        guard let uniqueID = AudioRecorder.uniqueID(
+            forLegacyDeviceID: storedDeviceID.uint32Value
+        ) else {
+            defaults.removeObject(forKey: Self.selectedDeviceKey)
+            print("Could not migrate selected audio input; using system default")
+            return
+        }
+
+        defaults.set(uniqueID, forKey: Self.selectedDeviceKey)
+        print("Migrated selected audio input to a persistent identifier")
+    }
+
     private func setupMenus() {
         let menu = NSMenu()
 
@@ -135,13 +157,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         refreshTranscriptHistoryMenu()
 
         let audioInputItem = NSMenuItem(title: "Audio Input", action: nil, keyEquivalent: "")
-        audioInputItem.submenu = createAudioInputSubmenu()
+        audioInputMenu.delegate = self
+        refreshAudioInputMenu()
+        audioInputItem.submenu = audioInputMenu
         menu.addItem(audioInputItem)
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
 
         statusItem?.menu = menu
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        guard menu === audioInputMenu else { return }
+        refreshAudioInputMenu()
     }
 
     private func refreshTranscriptHistoryMenu() {
@@ -231,24 +260,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         shortcutSettingsWindowController.present()
     }
 
-    private func createAudioInputSubmenu() -> NSMenu {
-        let submenu = NSMenu()
+    private func refreshAudioInputMenu() {
+        audioInputMenu.removeAllItems()
+
         let devices = AudioRecorder.getAvailableInputDevices()
-        let currentDeviceID = AudioRecorder.getCurrentInputDeviceID()
-        let savedDeviceID = UserDefaults.standard.object(forKey: Self.selectedDeviceKey) as? UInt32
+        let savedDeviceID = UserDefaults.standard.string(forKey: Self.selectedDeviceKey)
+        let savedDeviceIsAvailable = devices.contains {
+            $0.uniqueID == savedDeviceID
+        }
 
         let defaultItem = NSMenuItem(
             title: "System Default",
             action: #selector(selectAudioDevice(_:)),
             keyEquivalent: ""
         )
-        defaultItem.tag = 0
         defaultItem.target = self
-        defaultItem.state = savedDeviceID == nil ? .on : .off
-        submenu.addItem(defaultItem)
+        defaultItem.state = savedDeviceID == nil || !savedDeviceIsAvailable ? .on : .off
+        audioInputMenu.addItem(defaultItem)
 
         if !devices.isEmpty {
-            submenu.addItem(NSMenuItem.separator())
+            audioInputMenu.addItem(NSMenuItem.separator())
         }
 
         for device in devices {
@@ -257,47 +288,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 action: #selector(selectAudioDevice(_:)),
                 keyEquivalent: ""
             )
-            item.tag = Int(device.id)
             item.target = self
-
-            let isSelected = if let savedID = savedDeviceID {
-                device.id == savedID
-            } else {
-                device.id == currentDeviceID
-            }
-
-            item.state = isSelected ? .on : .off
-            submenu.addItem(item)
+            item.representedObject = device.uniqueID
+            item.state = device.uniqueID == savedDeviceID ? .on : .off
+            audioInputMenu.addItem(item)
         }
-
-        return submenu
     }
 
     @objc private func selectAudioDevice(_ sender: NSMenuItem) {
-        guard let menu = statusItem?.menu,
-              let audioInputItem = menu.items.first(where: { $0.title == "Audio Input" }),
-              let submenu = audioInputItem.submenu else { return }
-
-        for item in submenu.items {
+        for item in audioInputMenu.items {
             item.state = .off
         }
 
         sender.state = .on
 
-        if sender.tag == 0 {
-            UserDefaults.standard.removeObject(forKey: Self.selectedDeviceKey)
-            audioRecorder.setInputDevice(id: nil)
-            print("Audio input set to system default")
-        } else {
-            let deviceID = UInt32(sender.tag)
+        if let deviceID = sender.representedObject as? String {
             UserDefaults.standard.set(deviceID, forKey: Self.selectedDeviceKey)
             audioRecorder.setInputDevice(id: deviceID)
             print("Audio input set to: \(sender.title)")
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.selectedDeviceKey)
+            audioRecorder.setInputDevice(id: nil)
+            print("Audio input set to system default")
         }
     }
 
     private func restoreSelectedDevice() {
-        if let savedDeviceID = UserDefaults.standard.object(forKey: Self.selectedDeviceKey) as? UInt32 {
+        if let savedDeviceID = UserDefaults.standard.string(forKey: Self.selectedDeviceKey) {
             audioRecorder.setInputDevice(id: savedDeviceID)
             print("Restored audio input device: \(savedDeviceID)")
         }
@@ -471,24 +488,76 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleHotkeyDown() {
         let targetApplication = NSWorkspace.shared.frontmostApplication
+        let attemptID = UUID()
+        recordingAttemptID = attemptID
         isRecordingHotkeyHeld = true
         updateStatusIcon(recording: true)
 
         recordingCuePlayer.playStartCue { [weak self] in
-            guard let self, self.isRecordingHotkeyHeld else { return }
-            self.startRecording(targetApplication: targetApplication)
+            guard let self,
+                  self.isRecordingHotkeyHeld,
+                  self.recordingAttemptID == attemptID else { return }
+            self.startRecording(
+                targetApplication: targetApplication,
+                attemptID: attemptID
+            )
         }
     }
 
-    private func startRecording(targetApplication: NSRunningApplication?) {
-        recordingStartTime = Date()
+    private func startRecording(
+        targetApplication: NSRunningApplication?,
+        attemptID: UUID
+    ) {
+        audioRecorder.startRecording(
+            attemptID: attemptID,
+            unexpectedFinish: { [weak self] error in
+                self?.handleUnexpectedRecordingFinish(
+                    error,
+                    attemptID: attemptID
+                )
+            },
+            completion: { [weak self] result in
+                self?.handleRecordingStart(
+                    result,
+                    targetApplication: targetApplication,
+                    attemptID: attemptID
+                )
+            }
+        )
+    }
 
-        guard audioRecorder.startRecording() else {
-            showNotification(title: "Recording Failed", body: "Could not start recording")
+    private func handleRecordingStart(
+        _ result: Result<AudioRecorder.RecordingStartInfo, Error>,
+        targetApplication: NSRunningApplication?,
+        attemptID: UUID
+    ) {
+        guard recordingAttemptID == attemptID, isRecordingHotkeyHeld else {
+            if case .success = result {
+                audioRecorder.cancelRecording(attemptID: attemptID)
+            }
+            return
+        }
+
+        switch result {
+        case .failure(let error):
+            recordingAttemptID = nil
+            showNotification(
+                title: "Recording Failed",
+                body: error.localizedDescription
+            )
             updateStatusIcon(error: true)
             recordingOverlay.hide()
             recordingStartTime = nil
             return
+        case .success(let startInfo):
+            recordingStartTime = Date()
+
+            if startInfo.usedSystemDefaultFallback {
+                showNotification(
+                    title: "Audio Input Unavailable",
+                    body: "Using \(startInfo.inputDeviceName) for this recording."
+                )
+            }
         }
 
         recordingOverlay.show(targetApplication: targetApplication) { [weak self] deltaTime in
@@ -497,11 +566,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("Recording started via hotkey")
     }
 
-    private func handleHotkeyUp() {
+    private func handleUnexpectedRecordingFinish(
+        _ error: Error,
+        attemptID: UUID
+    ) {
+        guard recordingAttemptID == attemptID else { return }
+
         isRecordingHotkeyHeld = false
+        recordingAttemptID = nil
+        recordingStartTime = nil
+        recordingCuePlayer.stop()
+        recordingOverlay.hide()
+        updateStatusIcon(error: true)
+        showNotification(
+            title: "Recording Failed",
+            body: error.localizedDescription
+        )
+    }
+
+    private func handleHotkeyUp() {
+        let attemptID = recordingAttemptID
+        isRecordingHotkeyHeld = false
+        recordingAttemptID = nil
         recordingCuePlayer.stop()
 
-        guard let startTime = recordingStartTime else {
+        guard let startTime = recordingStartTime,
+              let attemptID else {
             recordingOverlay.hide()
             updateStatusIcon(recording: false)
             return
@@ -511,17 +601,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         recordingOverlay.hide()
         updateStatusIcon(recording: false)
 
-        guard let recordingURL = audioRecorder.stopRecording() else {
+        let duration = Date().timeIntervalSince(startTime)
+        print("Recording duration: \(String(format: "%.1f", duration)) seconds")
+
+        let didRequestStop = audioRecorder.stopRecording(attemptID: attemptID) { [weak self] result in
+            self?.handleRecordingCompletion(result, duration: duration)
+        }
+
+        guard didRequestStop else {
             showNotification(title: "Recording Failed", body: "Could not save recording")
             updateStatusIcon(error: true)
             return
         }
+    }
 
-        let duration = Date().timeIntervalSince(startTime)
-        print("Recording duration: \(String(format: "%.1f", duration)) seconds")
+    private func handleRecordingCompletion(
+        _ result: Result<URL, Error>,
+        duration: TimeInterval
+    ) {
+        guard case .success(let recordingURL) = result else {
+            if case .failure(let error) = result {
+                showNotification(
+                    title: "Recording Failed",
+                    body: error.localizedDescription
+                )
+                updateStatusIcon(error: true)
+            }
+            return
+        }
 
         guard duration >= 0.5 else {
             print("Recording too short (\(String(format: "%.1f", duration))s), ignoring")
+            AudioRecorder.removeRecordingFile(at: recordingURL)
             return
         }
 
@@ -536,12 +647,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handleCancellation() {
+        let attemptID = recordingAttemptID
         isRecordingHotkeyHeld = false
+        recordingAttemptID = nil
         recordingStartTime = nil
         recordingCuePlayer.stop()
         recordingOverlay.hide()
         updateStatusIcon()
-        audioRecorder.cancelRecording()
+        if let attemptID {
+            audioRecorder.cancelRecording(attemptID: attemptID)
+        }
         print("Recording cancelled by user")
     }
 
@@ -578,7 +693,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 await MainActor.run {
                     updateStatusIcon()
                     handleTranscriptionResult(text)
-                    cleanupRecording(url)
+                    AudioRecorder.removeRecordingFile(at: url)
                 }
             } catch {
                 await MainActor.run {
@@ -593,7 +708,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         self?.updateStatusIcon()
                     }
 
-                    cleanupRecording(url)
+                    AudioRecorder.removeRecordingFile(at: url)
                 }
             }
         }
@@ -611,15 +726,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         transcriptHistory.add(trimmed)
         refreshTranscriptHistoryMenu()
         clipboardManager.copyAndPaste(trimmed)
-    }
-
-    private func cleanupRecording(_ url: URL) {
-        do {
-            try FileManager.default.removeItem(at: url)
-            print("Cleaned up recording: \(url.path)")
-        } catch {
-            print("Failed to cleanup recording: \(error)")
-        }
     }
 
     private func updateStatusIcon(recording: Bool = false, processing: Bool = false, downloading: Bool = false, error: Bool = false) {
