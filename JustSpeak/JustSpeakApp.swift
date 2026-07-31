@@ -45,7 +45,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var isRecordingHotkeyHeld = false
     private var recordingAttemptID: UUID?
     private var recordingStartTime: Date?
-    private var downloadProgressMenuItem: NSMenuItem?
+    private var modelSetupProgressMenuItem: NSMenuItem?
     private var accessibilityMenuItem: NSMenuItem?
     private let transcriptHistoryMenu = NSMenu()
     private let audioInputMenu = NSMenu()
@@ -320,25 +320,36 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    private func updateDownloadProgress(_ progress: Double) {
+    private func updateModelSetupProgress(_ progress: ModelSetupProgress) {
         guard let menu = statusItem?.menu else { return }
 
-        let progressText = String(format: "Downloading model: %.1f%%", progress * 100)
+        let progressText: String
+        switch progress {
+        case .downloading(let fractionCompleted):
+            progressText = String(
+                format: "Downloading model: %.1f%%",
+                fractionCompleted * 100
+            )
+        case .preparing:
+            progressText = "Preparing model..."
+        }
 
-        if let menuItem = downloadProgressMenuItem {
+        print(progressText)
+
+        if let menuItem = modelSetupProgressMenuItem {
             menuItem.title = progressText
         } else {
             let menuItem = NSMenuItem(title: progressText, action: nil, keyEquivalent: "")
             menuItem.isEnabled = false
             menu.insertItem(menuItem, at: 0)
-            downloadProgressMenuItem = menuItem
+            modelSetupProgressMenuItem = menuItem
         }
     }
 
-    private func removeDownloadProgress() {
-        guard let menuItem = downloadProgressMenuItem else { return }
+    private func removeModelSetupProgress() {
+        guard let menuItem = modelSetupProgressMenuItem else { return }
         statusItem?.menu?.removeItem(menuItem)
-        downloadProgressMenuItem = nil
+        modelSetupProgressMenuItem = nil
     }
 
     private func createAccessibilityMenuItem() -> NSMenuItem {
@@ -398,11 +409,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             )
 
             transcriptionService.downloadModelIfNeeded { [weak self] progress in
-                print(String(format: "Download progress: %.1f%%", progress * 100))
-                self?.updateDownloadProgress(progress)
+                self?.updateModelSetupProgress(progress)
             } completion: { [weak self] result in
                 self?.updateStatusIcon(downloading: false)
-                self?.removeDownloadProgress()
+                self?.removeModelSetupProgress()
 
                 switch result {
                 case .success:

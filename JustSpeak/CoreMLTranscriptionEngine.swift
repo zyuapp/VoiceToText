@@ -19,27 +19,27 @@ enum CoreMLTranscriptionEngineError: LocalizedError, Sendable {
     }
 }
 
-nonisolated final class ModelSetupProgress: @unchecked Sendable {
-    private static let maximumBeforeReady = 0.95
+nonisolated enum ModelSetupProgress: Equatable, Sendable {
+    case downloading(fractionCompleted: Double)
+    case preparing
 
-    private let lock = NSLock()
-    private var lastReported = 0.0
+    static func from(_ update: DownloadUtils.DownloadProgress) -> Self {
+        switch update.phase {
+        case .listing:
+            return .downloading(fractionCompleted: 0)
+        case .downloading(_, let totalFiles):
+            guard totalFiles > 0 else { return .preparing }
 
-    func normalize(_ upstreamFraction: Double) -> Double {
-        lock.lock()
-        defer { lock.unlock() }
-
-        let normalized = min(
-            max(upstreamFraction, 0),
-            Self.maximumBeforeReady
-        )
-        lastReported = max(lastReported, normalized)
-        return lastReported
+            let downloadFraction = min(max(update.fractionCompleted * 2, 0), 1)
+            return .downloading(fractionCompleted: downloadFraction)
+        case .compiling:
+            return .preparing
+        }
     }
 }
 
 actor CoreMLTranscriptionEngine {
-    typealias ProgressHandler = @Sendable (Double) -> Void
+    typealias ProgressHandler = @Sendable (ModelSetupProgress) -> Void
 
     private static let modelVersion: AsrModelVersion = .v2
     private static let minimumInferenceSamples = 16_000
@@ -72,17 +72,16 @@ actor CoreMLTranscriptionEngine {
     }
 
     func downloadAndInitialize(progress: ProgressHandler? = nil) async throws {
-        let setupProgress = ModelSetupProgress()
-        progress?(0)
+        progress?(.downloading(fractionCompleted: 0))
 
         do {
             let models = try await AsrModels.downloadAndLoad(
                 version: Self.modelVersion
             ) { update in
-                progress?(setupProgress.normalize(update.fractionCompleted))
+                progress?(ModelSetupProgress.from(update))
             }
+            progress?(.preparing)
             try await configureManager(with: models)
-            progress?(1)
         } catch let error as CoreMLTranscriptionEngineError {
             throw error
         } catch {
