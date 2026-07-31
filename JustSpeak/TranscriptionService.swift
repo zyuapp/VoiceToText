@@ -45,14 +45,15 @@ final class TranscriptionService {
     }
 
     func downloadModelIfNeeded(
-        progress: @escaping @MainActor @Sendable (Double) -> Void,
+        progress: @escaping @MainActor @Sendable (ModelSetupProgress) -> Void,
         completion: @escaping @MainActor @Sendable (Result<Void, Error>) -> Void
     ) {
         ready = false
-        let (progressStream, progressContinuation) = AsyncStream<Double>.makeStream()
+        let (progressStream, progressContinuation) =
+            AsyncStream<ModelSetupProgress>.makeStream()
         let progressDelivery = Task {
-            for await downloadProgress in progressStream {
-                progress(downloadProgress)
+            for await setupProgress in progressStream {
+                progress(setupProgress)
             }
         }
 
@@ -65,8 +66,8 @@ final class TranscriptionService {
 
             let result: Result<Void, Error>
             do {
-                try await engine.downloadAndInitialize { downloadProgress in
-                    progressContinuation.yield(downloadProgress)
+                try await engine.downloadAndInitialize { setupProgress in
+                    progressContinuation.yield(setupProgress)
                 }
                 ready = true
                 result = .success(())
