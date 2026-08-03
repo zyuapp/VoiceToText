@@ -66,11 +66,6 @@ class ClipboardManager {
             startNextInsertionIfNeeded()
             return
         }
-        guard pasteboard.changeCount == transcriptChangeCount else {
-            pendingTranscripts.removeAll()
-            return
-        }
-
         activeProvider = provider
         activeInsertion = ActiveInsertion(
             id: insertionID,
@@ -86,7 +81,7 @@ class ClipboardManager {
                   let insertion = self.activeInsertion,
                   insertion.id == id else { return }
             guard NSPasteboard.general.changeCount == insertion.changeCount else {
-                self.retryInsertion(id: id)
+                self.retryInsertion()
                 return
             }
 
@@ -109,9 +104,7 @@ class ClipboardManager {
         completeInsertion(id: id)
     }
 
-    private func retryInsertion(id: UUID) {
-        guard activeInsertion?.id == id else { return }
-
+    private func retryInsertion() {
         activeInsertion = nil
         activeProvider = nil
         startNextInsertionIfNeeded()
@@ -198,7 +191,6 @@ class ClipboardManager {
 private final class TranscriptPasteboardProvider: NSObject, NSPasteboardItemDataProvider {
     private let text: String
     private let completion: () -> Void
-    private var isProvidingData = false
 
     init(text: String, completion: @escaping () -> Void) {
         self.text = text
@@ -210,14 +202,10 @@ private final class TranscriptPasteboardProvider: NSObject, NSPasteboardItemData
         item: NSPasteboardItem,
         provideDataForType type: NSPasteboard.PasteboardType
     ) {
-        isProvidingData = true
         item.setString(text, forType: type)
-        isProvidingData = false
-        completion()
     }
 
     func pasteboardFinishedWithDataProvider(_ pasteboard: NSPasteboard) {
-        guard !isProvidingData else { return }
         completion()
     }
 }
