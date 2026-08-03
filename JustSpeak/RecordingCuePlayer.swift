@@ -1,12 +1,9 @@
 import AVFoundation
 
-final class RecordingCuePlayer: NSObject, AVAudioPlayerDelegate {
+final class RecordingCuePlayer {
     private var startSound: AVAudioPlayer?
-    private var playbackCompletion: (() -> Void)?
 
-    override init() {
-        super.init()
-
+    init() {
         guard let soundURL = Bundle.main.url(
             forResource: "DoubleSpark",
             withExtension: "wav"
@@ -17,56 +14,22 @@ final class RecordingCuePlayer: NSObject, AVAudioPlayerDelegate {
 
         do {
             startSound = try AVAudioPlayer(contentsOf: soundURL)
-            startSound?.delegate = self
             startSound?.prepareToPlay()
         } catch {
             print("Could not load Double Spark recording cue: \(error)")
         }
     }
 
-    func playStartCue(completion: @escaping () -> Void) {
+    func playStartCue() {
         stop()
-        playbackCompletion = completion
 
-        guard let startSound else {
-            finishPlayback()
-            return
-        }
+        guard let startSound else { return }
 
         startSound.currentTime = 0
-
-        guard startSound.play() else {
-            finishPlayback()
-            return
-        }
+        startSound.play()
     }
 
     func stop() {
         startSound?.stop()
-        playbackCompletion = nil
-    }
-
-    func audioPlayerDidFinishPlaying(
-        _ player: AVAudioPlayer,
-        successfully flag: Bool
-    ) {
-        finishPlayback()
-    }
-
-    func audioPlayerDecodeErrorDidOccur(
-        _ player: AVAudioPlayer,
-        error: Error?
-    ) {
-        if let error {
-            print("Double Spark recording cue playback failed: \(error)")
-        }
-
-        finishPlayback()
-    }
-
-    private func finishPlayback() {
-        let completion = playbackCompletion
-        playbackCompletion = nil
-        completion?()
     }
 }
