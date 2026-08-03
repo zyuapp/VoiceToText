@@ -694,6 +694,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func processRecording(url: URL) {
         guard transcriptionService.isReady else {
+            AudioRecorder.removeRecordingFile(at: url)
             showNotification(
                 title: "Transcription Unavailable",
                 body: "Parakeet model not ready. Please wait for download to complete."
