@@ -9,7 +9,6 @@ class ClipboardManager {
         let id: UUID
         let previousContents: [NSPasteboardItem]
         let changeCount: Int
-        var pastePosted = false
     }
 
     private struct PasteboardSnapshot {
@@ -19,7 +18,6 @@ class ClipboardManager {
 
     private var pendingTranscripts: [String] = []
     private var activeInsertion: ActiveInsertion?
-    private var activeProvider: TranscriptPasteboardProvider?
 
     private init() {}
 
@@ -40,24 +38,12 @@ class ClipboardManager {
             return
         }
         let insertionID = UUID()
-        let provider = TranscriptPasteboardProvider(text: text) { [weak self] in
-            DispatchQueue.main.async {
-                self?.handleDataRequest(id: insertionID)
-            }
-        }
-        let item = NSPasteboardItem()
-        guard item.setDataProvider(provider, forTypes: [.string]) else {
-            pendingTranscripts.removeFirst()
-            startNextInsertionIfNeeded()
-            return
-        }
-
         guard pasteboard.changeCount == previousContents.changeCount else {
             pendingTranscripts.removeAll()
             return
         }
         let transcriptChangeCount = pasteboard.clearContents()
-        guard pasteboard.writeObjects([item]) else {
+        guard pasteboard.setString(text, forType: .string) else {
             restorePasteboard(
                 previousContents.items,
                 ifUnchangedSince: transcriptChangeCount
@@ -66,7 +52,6 @@ class ClipboardManager {
             startNextInsertionIfNeeded()
             return
         }
-        activeProvider = provider
         activeInsertion = ActiveInsertion(
             id: insertionID,
             previousContents: previousContents.items,
@@ -81,33 +66,19 @@ class ClipboardManager {
                   let insertion = self.activeInsertion,
                   insertion.id == id else { return }
             guard NSPasteboard.general.changeCount == insertion.changeCount else {
-                self.retryInsertion()
+                self.completeInsertion(id: id)
                 return
             }
 
-            self.activeInsertion?.pastePosted = true
             guard self.postPasteShortcut() else {
                 self.completeInsertion(id: id)
                 return
             }
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.completeInsertion(id: id)
             }
         }
-    }
-
-    private func handleDataRequest(id: UUID) {
-        guard let insertion = activeInsertion,
-              insertion.id == id,
-              insertion.pastePosted else { return }
-        completeInsertion(id: id)
-    }
-
-    private func retryInsertion() {
-        activeInsertion = nil
-        activeProvider = nil
-        startNextInsertionIfNeeded()
     }
 
     private func completeInsertion(id: UUID) {
@@ -123,7 +94,6 @@ class ClipboardManager {
         }
 
         activeInsertion = nil
-        activeProvider = nil
         pendingTranscripts.removeFirst()
 
         if stillOwnsPasteboard {
@@ -185,27 +155,5 @@ class ClipboardManager {
         if !items.isEmpty {
             pasteboard.writeObjects(items)
         }
-    }
-}
-
-private final class TranscriptPasteboardProvider: NSObject, NSPasteboardItemDataProvider {
-    private let text: String
-    private let completion: () -> Void
-
-    init(text: String, completion: @escaping () -> Void) {
-        self.text = text
-        self.completion = completion
-    }
-
-    func pasteboard(
-        _ pasteboard: NSPasteboard?,
-        item: NSPasteboardItem,
-        provideDataForType type: NSPasteboard.PasteboardType
-    ) {
-        item.setString(text, forType: type)
-    }
-
-    func pasteboardFinishedWithDataProvider(_ pasteboard: NSPasteboard) {
-        completion()
     }
 }
