@@ -14,7 +14,6 @@ class AudioRecorder: NSObject {
     }
 
     private enum RecorderError: LocalizedError {
-        case recordingInProgress
         case inputDeviceUnavailable
         case inputCannotBeAdded
         case outputCannotBeAdded
@@ -25,8 +24,6 @@ class AudioRecorder: NSObject {
 
         var errorDescription: String? {
             switch self {
-            case .recordingInProgress:
-                return "Another recording is still finishing."
             case .inputDeviceUnavailable:
                 return "No audio input device is available."
             case .inputCannotBeAdded:
@@ -130,10 +127,9 @@ class AudioRecorder: NSObject {
         attemptID: UUID,
         unexpectedFinish: @escaping (Error) -> Void,
         completion: @escaping (Result<RecordingStartInfo, Error>) -> Void
-    ) {
+    ) -> Bool {
         guard captureSession == nil, !isStarting else {
-            completion(.failure(RecorderError.recordingInProgress))
-            return
+            return false
         }
 
         isStarting = true
@@ -166,6 +162,8 @@ class AudioRecorder: NSObject {
                 }
             }
         }
+
+        return true
     }
 
     func stopRecording(

@@ -503,22 +503,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         isRecordingHotkeyHeld = true
         updateStatusIcon(recording: true)
 
-        recordingCuePlayer.playStartCue { [weak self] in
-            guard let self,
-                  self.isRecordingHotkeyHeld,
-                  self.recordingAttemptID == attemptID else { return }
-            self.startRecording(
-                targetApplication: targetApplication,
-                attemptID: attemptID
-            )
-        }
+        startRecording(
+            targetApplication: targetApplication,
+            attemptID: attemptID
+        )
     }
 
     private func startRecording(
         targetApplication: NSRunningApplication?,
         attemptID: UUID
     ) {
-        audioRecorder.startRecording(
+        let didRequestStart = audioRecorder.startRecording(
             attemptID: attemptID,
             unexpectedFinish: { [weak self] error in
                 self?.handleUnexpectedRecordingFinish(
@@ -534,6 +529,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 )
             }
         )
+
+        if didRequestStart {
+            recordingCuePlayer.playStartCue()
+        } else {
+            retryRecordingStart(
+                targetApplication: targetApplication,
+                attemptID: attemptID
+            )
+        }
+    }
+
+    private func retryRecordingStart(
+        targetApplication: NSRunningApplication?,
+        attemptID: UUID
+    ) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            guard let self,
+                  self.isRecordingHotkeyHeld,
+                  self.recordingAttemptID == attemptID else { return }
+            self.startRecording(
+                targetApplication: targetApplication,
+                attemptID: attemptID
+            )
+        }
     }
 
     private func handleRecordingStart(
