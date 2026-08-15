@@ -38,6 +38,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let transcriptHistory = TranscriptHistoryStore()
     private let recordingOverlay = RecordingOverlayController()
     private let recordingCuePlayer = RecordingCuePlayer()
+    private let systemAudioSilencer = SystemAudioSilencer()
     private lazy var shortcutSettingsWindowController = ShortcutSettingsWindowController(
         store: shortcutStore,
         captureController: shortcutCaptureController
@@ -70,6 +71,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         updateAccessibilityMenuItem()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        systemAudioSilencer.restore()
     }
 
     private func requestNotificationPermission() {
@@ -531,7 +536,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
 
         if didRequestStart {
-            recordingCuePlayer.playStartCue()
+            recordingCuePlayer.playStartCue { [weak self] in
+                guard let self,
+                      self.isRecordingHotkeyHeld,
+                      self.recordingAttemptID == attemptID else { return }
+                self.systemAudioSilencer.silence()
+            }
         } else {
             retryRecordingStart(
                 targetApplication: targetApplication,
@@ -569,6 +579,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         switch result {
         case .failure(let error):
+            systemAudioSilencer.restore()
             recordingAttemptID = nil
             showNotification(
                 title: "Recording Failed",
@@ -601,6 +612,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     ) {
         guard recordingAttemptID == attemptID else { return }
 
+        systemAudioSilencer.restore()
         isRecordingHotkeyHeld = false
         recordingAttemptID = nil
         recordingStartTime = nil
@@ -614,6 +626,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func handleHotkeyUp() {
+        systemAudioSilencer.restore()
         let attemptID = recordingAttemptID
         isRecordingHotkeyHeld = false
         recordingAttemptID = nil
@@ -669,6 +682,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func handleCancellation() {
+        systemAudioSilencer.restore()
         let attemptID = recordingAttemptID
         isRecordingHotkeyHeld = false
         recordingAttemptID = nil
