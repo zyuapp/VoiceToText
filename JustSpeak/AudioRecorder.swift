@@ -97,28 +97,6 @@ class AudioRecorder: NSObject {
         }
     }
 
-    static func uniqueID(forLegacyDeviceID deviceID: UInt32) -> String? {
-        var propertyAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyDeviceUID,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var unmanagedDeviceUID: Unmanaged<CFString>?
-        var dataSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
-
-        let status = AudioObjectGetPropertyData(
-            deviceID,
-            &propertyAddress,
-            0,
-            nil,
-            &dataSize,
-            &unmanagedDeviceUID
-        )
-
-        guard status == noErr, let unmanagedDeviceUID else { return nil }
-        return unmanagedDeviceUID.takeUnretainedValue() as String
-    }
-
     func setInputDevice(id: String?) {
         selectedDeviceUniqueID = id
     }
@@ -168,6 +146,7 @@ class AudioRecorder: NSObject {
 
     func stopRecording(
         attemptID: UUID,
+        didStopCapture: @escaping () -> Void,
         completion: @escaping (Result<URL, Error>) -> Void
     ) -> Bool {
         guard let audioFileOutput,
@@ -181,6 +160,7 @@ class AudioRecorder: NSObject {
         stopCompletion = completion
         captureQueue.async {
             audioFileOutput.stopRecording()
+            DispatchQueue.main.async(execute: didStopCapture)
         }
         return true
     }

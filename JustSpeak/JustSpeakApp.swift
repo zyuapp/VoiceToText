@@ -57,6 +57,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private static let legacyBundleIdentifier = "com.zyu.VoiceToText"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        systemAudioSilencer.recover()
         requestNotificationPermission()
         migrateLegacyPreferencesIfNeeded()
         migrateSelectedAudioInputPreferenceIfNeeded()
@@ -116,8 +117,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
               !(storedPreference is String),
               let storedDeviceID = storedPreference as? NSNumber else { return }
 
-        guard let uniqueID = AudioRecorder.uniqueID(
-            forLegacyDeviceID: storedDeviceID.uint32Value
+        guard let uniqueID = CoreAudioDevice.uniqueID(
+            for: storedDeviceID.uint32Value
         ) else {
             defaults.removeObject(forKey: Self.selectedDeviceKey)
             print("Could not migrate selected audio input; using system default")
@@ -626,7 +627,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func handleHotkeyUp() {
-        systemAudioSilencer.restore()
         let attemptID = recordingAttemptID
         isRecordingHotkeyHeld = false
         recordingAttemptID = nil
@@ -634,6 +634,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         guard let startTime = recordingStartTime,
               let attemptID else {
+            systemAudioSilencer.restore()
             recordingOverlay.hide()
             updateStatusIcon(recording: false)
             return
@@ -646,11 +647,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let duration = Date().timeIntervalSince(startTime)
         print("Recording duration: \(String(format: "%.1f", duration)) seconds")
 
-        let didRequestStop = audioRecorder.stopRecording(attemptID: attemptID) { [weak self] result in
-            self?.handleRecordingCompletion(result, duration: duration)
-        }
+        let didRequestStop = audioRecorder.stopRecording(
+            attemptID: attemptID,
+            didStopCapture: { [weak self] in
+                self?.systemAudioSilencer.restore()
+            },
+            completion: { [weak self] result in
+                self?.handleRecordingCompletion(result, duration: duration)
+            }
+        )
 
         guard didRequestStop else {
+            systemAudioSilencer.restore()
             showNotification(title: "Recording Failed", body: "Could not save recording")
             updateStatusIcon(error: true)
             return
