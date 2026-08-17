@@ -39,6 +39,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let recordingOverlay = RecordingOverlayController()
     private let recordingCuePlayer = RecordingCuePlayer()
     private let systemAudioSilencer = SystemAudioSilencer()
+#if !LOCAL_BUILD
+    private let updateController = UpdateController()
+#endif
     private lazy var shortcutSettingsWindowController = ShortcutSettingsWindowController(
         store: shortcutStore,
         captureController: shortcutCaptureController
@@ -64,6 +67,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         observeShortcutSettings()
         setupStatusItem()
         setupMenus()
+#if !LOCAL_BUILD
+        updateController.start()
+#endif
         setupHotkeyManager()
         setupTranscriptionService()
         restoreSelectedDevice()
@@ -168,6 +174,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         audioInputItem.submenu = audioInputMenu
         menu.addItem(audioInputItem)
 
+#if !LOCAL_BUILD
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(updateController.menuItem)
+#endif
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
 

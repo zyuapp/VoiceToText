@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		FA0000030000000000000001 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = FA0000020000000000000001 /* FluidAudio */; };
+		SP0000030000000000000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = SP0000020000000000000001 /* Sparkle */; };
 		FA10000B0000000000000001 /* CoreMLTranscriptionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA10000A0000000000000001 /* CoreMLTranscriptionEngine.swift */; };
 		FA10000D0000000000000001 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = FA10000C0000000000000001 /* FluidAudio */; };
 /* End PBXBuildFile section */
@@ -18,9 +19,22 @@
 		FA10000A0000000000000001 /* CoreMLTranscriptionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JustSpeak/CoreMLTranscriptionEngine.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		SP0000040000000000000001 /* Exceptions for "JustSpeak" folder in "JustSpeak" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = BCFDA99E2EC2EDEC0065341A /* JustSpeak */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		BCFDA9A12EC2EDEC0065341A /* JustSpeak */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				SP0000040000000000000001 /* Exceptions for "JustSpeak" folder in "JustSpeak" target */,
+			);
 			path = JustSpeak;
 			sourceTree = "<group>";
 		};
@@ -37,6 +51,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FA0000030000000000000001 /* FluidAudio in Frameworks */,
+				SP0000030000000000000001 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -90,6 +105,7 @@
 			name = JustSpeak;
 			packageProductDependencies = (
 				FA0000020000000000000001 /* FluidAudio */,
+				SP0000020000000000000001 /* Sparkle */,
 			);
 			productName = JustSpeak;
 			productReference = BCFDA99F2EC2EDEC0065341A /* JustSpeak.app */;
@@ -149,6 +165,7 @@
 			productRefGroup = BCFDA9A02EC2EDEC0065341A /* Products */;
 			packageReferences = (
 				FA0000010000000000000001 /* XCRemoteSwiftPackageReference "FluidAudio" */,
+				SP0000010000000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			projectDirPath = "";
 			projectRoot = "";
@@ -313,6 +330,7 @@
 		BCFDA9AB2EC2EDED0065341A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_DISPLAY_NAME = "Just Speak";
 				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -323,10 +341,8 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Just Speak";
-				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Just Speak needs access to your microphone to record your voice for transcription.";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = JustSpeak/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -361,21 +377,21 @@
 		BCFDA9AC2EC2EDED0065341A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_DISPLAY_NAME = "Just Speak";
 				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = JustSpeak/JustSpeak.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 130;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				EXCLUDED_ARCHS = x86_64;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Just Speak";
-				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Just Speak needs access to your microphone to record your voice for transcription.";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = JustSpeak/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -390,7 +406,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.zyu.just-speak;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -490,6 +506,14 @@
 				version = 0.12.6;
 			};
 		};
+		SP0000010000000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.9.2;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -502,6 +526,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = FA0000010000000000000001 /* XCRemoteSwiftPackageReference "FluidAudio" */;
 			productName = FluidAudio;
+		};
+		SP0000020000000000000001 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = SP0000010000000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

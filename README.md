@@ -30,9 +30,8 @@ Install with Homebrew Cask:
 brew install --cask zyuapp/tap/just-speak
 ```
 
-Or download the latest zip from the GitHub Releases page and move `JustSpeak.app` to `/Applications`.
-
-Note: builds are currently unsigned and not notarized, so macOS may show a security warning on first launch. If that happens, open System Settings > Privacy & Security, scroll to Security, click Open Anyway for JustSpeak, then confirm Open.
+Or download the latest DMG from the GitHub Releases page and drag Just Speak
+to Applications. The same signed and notarized DMG is used for Sparkle updates.
 
 ### Build from Source
 
@@ -44,20 +43,20 @@ cd just-speak
 # Build with local development signing
 make build
 
-# Install a release build in /Applications
+# Install an OTA-disabled Just Speak Dev build in /Applications
 make install
 ```
 
-The Makefile discovers a valid Apple Development certificate from your local
-Keychain and uses it without storing its identity in the repository. Keeping
-the certificate-backed code identity and `com.zyu.just-speak` bundle identifier
-stable allows microphone and Accessibility grants to survive rebuilds. If no
-suitable certificate is available, the build safely uses ad-hoc signing and
-warns that macOS may request those permissions again.
+The Makefile installs `/Applications/Just Speak Dev.app` with the
+`com.zyu.just-speak.dev` bundle identifier, leaving the production app intact.
+It uses an available Apple signing certificate from the local Keychain so the
+dev app's microphone and Accessibility grants survive rebuilds. If no suitable
+certificate is available, the build safely uses ad-hoc signing and warns that
+macOS may request those permissions again.
 
-This is only for local build and install workflows. It is not Developer ID or
-App Store signing, and it does not notarize the app or change how public
-releases are packaged.
+Local builds are release-optimized but disable production OTA checks and are
+not notarized. Tagged public releases retain `com.zyu.just-speak`, enable OTA,
+and are signed, notarized, and published by GitHub Actions.
 
 ## Usage
 
@@ -66,6 +65,7 @@ releases are packaged.
 3. **Transcribe** - Release the shortcut to stop and auto-paste
 4. **Cancel** - Press Escape while recording to abort
 5. **Customize** - Choose Change Shortcut… from the menu bar app
+6. **Update** - Download and restart into new versions from the menu bar
 
 ## Tech Stack
 
