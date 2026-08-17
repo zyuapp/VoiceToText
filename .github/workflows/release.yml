@@ -110,6 +110,7 @@ jobs:
           xcrun stapler validate "$app"
           spctl --assess --type execute --verbose=2 "$app"
           ./scripts/create-dmg.sh "$app" "dist/$artifact"
+          codesign --force --timestamp --sign "Developer ID Application" "dist/$artifact"
           xcrun notarytool submit "dist/$artifact" \
             --key "$RUNNER_TEMP/apple.p8" \
             --key-id "$APPLE_API_KEY_ID" \
