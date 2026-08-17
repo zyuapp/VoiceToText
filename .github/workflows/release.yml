@@ -54,6 +54,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          app="build/Build/Products/Release/JustSpeak.app"
           xcodebuild -quiet \
             -project JustSpeak.xcodeproj \
             -scheme JustSpeak \
@@ -64,7 +65,27 @@ jobs:
             CODE_SIGN_IDENTITY="Developer ID Application" \
             OTHER_CODE_SIGN_FLAGS="--timestamp" \
             build
-          codesign --verify --deep --strict build/Build/Products/Release/JustSpeak.app
+          for sign_target in \
+            "$app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate" \
+            "$app/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app" \
+            "$app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Downloader.xpc" \
+            "$app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc" \
+            "$app/Contents/Frameworks/Sparkle.framework"
+          do
+            codesign --force \
+              --options runtime \
+              --timestamp \
+              --sign "Developer ID Application" \
+              "$sign_target"
+          done
+          codesign --force \
+            --options runtime \
+            --timestamp \
+            --sign "Developer ID Application" \
+            --entitlements JustSpeak/JustSpeak.entitlements \
+            "$app"
+          codesign --verify --deep --strict "$app"
+          ! codesign -d --entitlements :- "$app" 2>/dev/null | grep -q com.apple.security.get-task-allow
 
       - name: Notarize and package
         shell: bash
