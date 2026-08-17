@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: macos-latest
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Restore signing credentials
+        shell: bash
+        env:
+          MAC_CERTIFICATE_P12: ${{ secrets.MAC_CERTIFICATE_P12 }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$MAC_CERTIFICATE_P12" | base64 -D > "$RUNNER_TEMP/just-speak.p12"
+          printf '%s' "$APPLE_API_KEY_P8" | base64 -D > "$RUNNER_TEMP/apple.p8"
+          security create-keychain -p runner "$RUNNER_TEMP/signing.keychain-db"
+          security set-keychain-settings -lut 21600 "$RUNNER_TEMP/signing.keychain-db"
+          security unlock-keychain -p runner "$RUNNER_TEMP/signing.keychain-db"
+          security import "$RUNNER_TEMP/just-speak.p12" \
+            -k "$RUNNER_TEMP/signing.keychain-db" \
+            -P "$MAC_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k runner \
+            "$RUNNER_TEMP/signing.keychain-db"
+          security list-keychains -d user -s "$RUNNER_TEMP/signing.keychain-db"
+
+      - name: Verify release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          project_version=$(xcodebuild -project JustSpeak.xcodeproj -scheme JustSpeak -configuration Release -showBuildSettings | awk '/MARKETING_VERSION/ { print $3; exit }')
+          test "$version" = "$project_version"
+
+      - name: Build and sign
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -quiet \
+            -project JustSpeak.xcodeproj \
+            -scheme JustSpeak \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=T3Y739SK63 \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            OTHER_CODE_SIGN_FLAGS="--timestamp" \
+            build
+          codesign --verify --deep --strict build/Build/Products/Release/JustSpeak.app
+
+      - name: Notarize and package
+        shell: bash
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          app="build/Build/Products/Release/JustSpeak.app"
+          artifact="JustSpeak-v${version}-macos-arm64.dmg"
+          submission="$RUNNER_TEMP/JustSpeak-notarization.zip"
+          mkdir -p dist
+          ditto -c -k --sequesterRsrc --keepParent "$app" "$submission"
+          xcrun notarytool submit "$submission" \
+            --key "$RUNNER_TEMP/apple.p8" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$app"
+          xcrun stapler validate "$app"
+          spctl --assess --type execute --verbose=2 "$app"
+          ./scripts/create-dmg.sh "$app" "dist/$artifact"
+          xcrun notarytool submit "dist/$artifact" \
+            --key "$RUNNER_TEMP/apple.p8" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "dist/$artifact"
+          xcrun stapler validate "dist/$artifact"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "dist/$artifact"
+          mount_dir="$RUNNER_TEMP/JustSpeakDMG"
+          mkdir "$mount_dir"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount_dir" "dist/$artifact"
+          test -L "$mount_dir/Applications"
+          test "$(plutil -extract CFBundleIdentifier raw "$mount_dir/Just Speak.app/Contents/Info.plist")" = "com.zyu.just-speak"
+          codesign --verify --deep --strict "$mount_dir/Just Speak.app"
+          hdiutil detach "$mount_dir"
+          generate_appcast=$(find build/SourcePackages/artifacts -type f -name generate_appcast -print -quit)
+          test -n "$generate_appcast"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | "$generate_appcast" \
+            --ed-key-file - \
+            --maximum-deltas 0 \
+            --download-url-prefix "https://github.com/zyuapp/just-speak/releases/download/$GITHUB_REF_NAME/" \
+            dist
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" \
+              --title "JustSpeak ${GITHUB_REF_NAME}" \
+              --generate-notes \
+              --verify-tag
+          gh release upload "$GITHUB_REF_NAME" \
+            dist/*.dmg \
+            dist/appcast.xml \
+            --clobber
