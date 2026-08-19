@@ -5,10 +5,14 @@ import CoreGraphics
 class ClipboardManager {
     static let shared = ClipboardManager()
 
+    private static let maxInsertionAttempts = 3
+    private static let retryDelay: TimeInterval = 0.05
+
     private struct ActiveInsertion {
         let id: UUID
         let previousContents: [NSPasteboardItem]
         let changeCount: Int
+        let attempt: Int
     }
 
     private struct PasteboardSnapshot {
@@ -28,34 +32,31 @@ class ClipboardManager {
         startNextInsertionIfNeeded()
     }
 
-    private func startNextInsertionIfNeeded() {
+    private func startNextInsertionIfNeeded(attempt: Int = 0) {
         guard activeInsertion == nil,
               let text = pendingTranscripts.first else { return }
 
         let pasteboard = NSPasteboard.general
-        guard let previousContents = copyPasteboardItems(from: pasteboard) else {
-            pendingTranscripts.removeAll()
+        guard let previousContents = copyPasteboardItems(from: pasteboard),
+              pasteboard.changeCount == previousContents.changeCount else {
+            retryOrDropCurrentTranscript(attempt: attempt)
             return
         }
         let insertionID = UUID()
-        guard pasteboard.changeCount == previousContents.changeCount else {
-            pendingTranscripts.removeAll()
-            return
-        }
-        let transcriptChangeCount = pasteboard.clearContents()
+        let transcriptChangeCount = pasteboard.prepareForNewContents(with: .currentHostOnly)
         guard pasteboard.setString(text, forType: .string) else {
             restorePasteboard(
                 previousContents.items,
                 ifUnchangedSince: transcriptChangeCount
             )
-            pendingTranscripts.removeFirst()
-            startNextInsertionIfNeeded()
+            dropCurrentTranscript()
             return
         }
         activeInsertion = ActiveInsertion(
             id: insertionID,
             previousContents: previousContents.items,
-            changeCount: transcriptChangeCount
+            changeCount: transcriptChangeCount,
+            attempt: attempt
         )
         schedulePaste(id: insertionID)
     }
@@ -65,8 +66,10 @@ class ClipboardManager {
             guard let self,
                   let insertion = self.activeInsertion,
                   insertion.id == id else { return }
+            // Universal Clipboard or another app can overwrite the transcript before we paste.
             guard NSPasteboard.general.changeCount == insertion.changeCount else {
-                self.completeInsertion(id: id)
+                self.activeInsertion = nil
+                self.retryOrDropCurrentTranscript(attempt: insertion.attempt)
                 return
             }
 
@@ -85,8 +88,7 @@ class ClipboardManager {
         guard let insertion = activeInsertion,
               insertion.id == id else { return }
 
-        let stillOwnsPasteboard = NSPasteboard.general.changeCount == insertion.changeCount
-        if stillOwnsPasteboard {
+        if NSPasteboard.general.changeCount == insertion.changeCount {
             restorePasteboard(
                 insertion.previousContents,
                 ifUnchangedSince: insertion.changeCount
@@ -95,12 +97,25 @@ class ClipboardManager {
 
         activeInsertion = nil
         pendingTranscripts.removeFirst()
+        startNextInsertionIfNeeded()
+    }
 
-        if stillOwnsPasteboard {
-            startNextInsertionIfNeeded()
-        } else {
-            pendingTranscripts.removeAll()
+    private func retryOrDropCurrentTranscript(attempt: Int) {
+        guard attempt + 1 < Self.maxInsertionAttempts else {
+            dropCurrentTranscript()
+            return
         }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.retryDelay) { [weak self] in
+            self?.startNextInsertionIfNeeded(attempt: attempt + 1)
+        }
+    }
+
+    private func dropCurrentTranscript() {
+        guard !pendingTranscripts.isEmpty else { return }
+
+        pendingTranscripts.removeFirst()
+        startNextInsertionIfNeeded()
     }
 
     private func copyPasteboardItems(from pasteboard: NSPasteboard) -> PasteboardSnapshot? {
@@ -151,7 +166,7 @@ class ClipboardManager {
         let pasteboard = NSPasteboard.general
         guard pasteboard.changeCount == changeCount else { return }
 
-        pasteboard.clearContents()
+        _ = pasteboard.prepareForNewContents(with: .currentHostOnly)
         if !items.isEmpty {
             pasteboard.writeObjects(items)
         }
